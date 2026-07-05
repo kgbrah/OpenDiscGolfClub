@@ -1,0 +1,169 @@
+{
+  "club": {
+    "name": "River City Disc Golf Club",
+    "tagline": "Weekly leagues, local courses, and community events",
+    "location": "River City, NC"
+  },
+  "stats": [
+    { "label": "Years Active", "value": "21" },
+    { "label": "Local Courses", "value": "5" },
+    { "label": "Active Leagues", "value": "3" },
+    { "label": "Annual Members", "value": "180+" }
+  ],
+  "courses": {
+    "title": "Courses",
+    "groups": [
+      {
+        "title": "Home Courses",
+        "description": "Core courses maintained or supported by the club.",
+        "courses": [
+          {
+            "name": "North River Park",
+            "location": "River City, NC",
+            "holes": 18,
+            "rating": "4.4",
+            "time": "2 hr",
+            "difficulty": "Moderate",
+            "description": "Mixed wooded and open fairways with multiple tee options.",
+            "udiscUrl": "https://udisc.com",
+            "coordinates": { "lat": 35.631092, "lng": -77.319923 }
+          },
+          {
+            "name": "Meadowbrook",
+            "location": "River City, NC",
+            "holes": 18,
+            "rating": "4.2",
+            "time": "90 min",
+            "difficulty": "Beginner Friendly",
+            "description": "A welcoming public park course for newer players and quick rounds."
+          }
+        ]
+      },
+      {
+        "title": "Worth the Drive",
+        "description": "Nearby courses the club recommends for day trips.",
+        "courses": [
+          {
+            "name": "Pine Ridge",
+            "location": "Oak County, NC",
+            "holes": 21,
+            "rating": "4.6",
+            "time": "2.5 hr",
+            "difficulty": "Advanced",
+            "description": "Technical woods, elevation, and tournament-caliber layouts."
+          }
+        ]
+      }
+    ]
+  },
+  "events": {
+    "title": "Upcoming Events",
+    "maxVisible": 4,
+    "items": [
+      {
+        "title": "Saturday Singles",
+        "date": "2026-08-08",
+        "description": "Check in at 9:00 AM. All skill levels welcome.",
+        "url": "https://example.com/events/saturday-singles"
+      },
+      {
+        "title": "Course Workday",
+        "date": "2026-08-15",
+        "description": "Bring gloves. The club provides tools and lunch."
+      }
+    ]
+  },
+  "tournaments": {
+    "title": "Area Tournaments",
+    "items": [
+      {
+        "name": "River City Open",
+        "date": "Aug 22 2026",
+        "location": "River City, NC",
+        "tier": "C-tier",
+        "url": "https://example.com/tournaments/river-city-open"
+      }
+    ]
+  },
+  "membership": {
+    "title": "Become a Member",
+    "description": "Support local courses, leagues, events, and player development.",
+    "priceLabel": "$15 / Year",
+    "benefits": [
+      "League and event discounts",
+      "Course maintenance support",
+      "Member-only announcements",
+      "Clinics and skill development"
+    ],
+    "payment": {
+      "provider": "external",
+      "label": "Join Today",
+      "url": "https://example.com/join"
+    }
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "items": [
+      {
+        "label": "Email",
+        "value": "club@example.com",
+        "url": "mailto:club@example.com"
+      },
+      {
+        "label": "Social",
+        "value": "Facebook group",
+        "url": "https://example.com"
+      },
+      {
+        "label": "Location",
+        "value": "River City, NC"
+      }
+    ]
+  },
+  "members": {
+    "title": "Member Directory",
+    "pdgaLinks": true,
+    "items": [
+      {
+        "firstName": "Alex",
+        "lastName": "Rivera",
+        "yearJoined": 2024,
+        "pdga": "123456",
+        "special": "Founder"
+      },
+      {
+        "firstName": "Morgan",
+        "lastName": "Stone",
+        "yearJoined": 2025
+      }
+    ]
+  },
+  "league": {
+    "title": "League Records",
+    "data": {
+      "seasonOrder": ["Spring 2026"],
+      "champions": [{ "season": "Spring 2026", "name": "Alex Rivera", "points": 128 }],
+      "leaderboard": [
+        {
+          "name": "Alex Rivera",
+          "seasons": 1,
+          "totalPoints": 128,
+          "bestFinish": 1,
+          "wins": 2,
+          "top3": 4,
+          "weeks": 8,
+          "seasonResults": [
+            {
+              "season": "Spring 2026",
+              "totalPoints": 128,
+              "bestPoints": 32,
+              "placement": 1,
+              "weeksAttended": 8,
+              "avgScore": 27.4
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

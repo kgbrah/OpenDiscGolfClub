@@ -1,0 +1,9 @@
+node_modules
+coverage
+test-results
+.playwright
+.DS_Store
+.env
+.env.*
+*.log
+*.tsbuildinfo
