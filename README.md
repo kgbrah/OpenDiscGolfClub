@@ -24,6 +24,16 @@ import "open-disc-golf-club"
 
 ## Guided Setup
 
+From a clone of this repo:
+
+```bash
+bun install
+bun run build
+bun dist/cli.mjs setup
+```
+
+After the package is published to npm:
+
 ```bash
 npx open-disc-golf-club setup
 ```
