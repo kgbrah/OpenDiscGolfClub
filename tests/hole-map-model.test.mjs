@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { addThrow, CIRCLE1_M, CIRCLE2_M, circleEllipse, currentRangeHud, flightArc, flightPoint, GPS_REMAINING_MAX_FT, GPS_WATCH_OPTIONS, gpsErrorPolicy, gpsHudPrompt, headingDeg, holeMapLabel, holePoint, lastThrow, lastThrowHud, latLngFromMapPoint, mapFocusFromRemaining, nextTeeHud, playerMarksOnMap, playerPhotoSrc, projectHoleMap, projectMapPoint, puttingCircle, rangeHud, readAllThrows, readThrows, remainingFt, resolveMapFocus, satelliteImageUrl, scoreChipAnchor, teePadRotationDeg, throwSegments, throwsStorageKey, undoThrow, windBlowToDeg, withSelfLocation, writeThrows } from "../src/shared/hole-map-model.js";
+import { addThrow, CIRCLE1_M, CIRCLE2_M, circleEllipse, currentRangeHud, flightArc, flightPoint, GPS_REMAINING_MAX_FT, GPS_WATCH_OPTIONS, gpsErrorPolicy, gpsHudPrompt, headingDeg, holeMapLabel, holePoint, lastThrow, lastThrowHud, latLngFromMapPoint, mapFocusFromRemaining, nextTeeHud, playerMarksOnMap, playerPhotoSrc, projectHoleMap, projectLooseHoleMap, projectMapPoint, puttingCircle, rangeHud, readAllThrows, readThrows, remainingFt, resolveMapFocus, satelliteImageUrl, scoreChipAnchor, teePadRotationDeg, throwSegments, throwsStorageKey, undoThrow, windBlowToDeg, withSelfLocation, writeThrows } from "../src/shared/hole-map-model.js";
 
 test("holePoint requires numeric lat/lng", () => {
   assert.equal(holePoint(null), null);
@@ -51,6 +51,24 @@ test("projectHoleMap hides identical tee and basket points", () => {
     tee: { lat: 35, lng: -77 },
     target: { lat: 35, lng: -77 },
   }), null);
+});
+
+test("a hole with only a tee or only a GPS fix still frames a map", () => {
+  const teeOnly = projectLooseHoleMap({ tee: { lat: 35.61, lng: -77.37 } });
+  assert.equal(teeOnly.loose, true);
+  assert.ok(teeOnly.tee);
+  assert.equal(teeOnly.basket, null);
+  assert.ok(teeOnly.satelliteUrl);
+  const here = projectLooseHoleMap({}, { here: { lat: 35.62, lng: -77.36 } });
+  assert.equal(here.loose, true);
+  assert.equal(here.tee, null);
+  assert.ok(here.bounds.maxLat > here.bounds.minLat);
+  const full = projectLooseHoleMap({
+    tee: { lat: 35.61, lng: -77.37 },
+    target: { lat: 35.62, lng: -77.36 },
+  });
+  assert.equal(full.loose, undefined);
+  assert.ok(full.tee && full.basket);
 });
 
 test("heading and wind helpers stay on the compass", () => {

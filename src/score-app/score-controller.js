@@ -885,7 +885,10 @@ export function startScoreApp(options) {
             S.weather = d.weather || null;
             S.playerLocations = Array.isArray(d.playerLocations) ? d.playerLocations : [];
             S.scorerIndex = d.playerIndex;
-            if (MODE === 'round') rememberRecentRound({ code: ROUND_CODE, label: 'Casual round ' + ROUND_CODE });
+            if (MODE === 'round') {
+                const place = [S.courseName, S.layoutName].filter(Boolean).join(' · ');
+                rememberRecentRound({ code: ROUND_CODE, label: place || ('Casual round ' + ROUND_CODE) });
+            }
             currentScorerIndex();
             setConflicts(d.conflicts);
             setMissing(d.missing);

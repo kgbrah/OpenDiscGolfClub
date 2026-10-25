@@ -1,6 +1,6 @@
 import React from "react";
 
-import { flightArc, flightPoint, holeMapLabel, HOLE_MAP_COMPACT_SIZE, HOLE_MAP_SIZE, HOLE_MAP_WATCH_SIZE, latLngFromMapPoint, playerMarksOnMap, playerPhotoSrc, projectHoleMap, projectMapPoint, SATELLITE_CREDIT, satelliteTileLayers, scoreChipAnchor, throwSegments } from "./hole-map-model.js";
+import { flightArc, flightPoint, holeMapLabel, HOLE_MAP_COMPACT_SIZE, HOLE_MAP_SIZE, HOLE_MAP_WATCH_SIZE, latLngFromMapPoint, playerMarksOnMap, playerPhotoSrc, projectLooseHoleMap, projectMapPoint, SATELLITE_CREDIT, satelliteTileLayers, scoreChipAnchor, throwSegments } from "./hole-map-model.js";
 import { discColorPattern } from "./disc-color.js";
 import { HEATMAP_MIN_SAMPLES, HeatmapLayer, useHoleHeatmap } from "./hole-heatmap.js";
 import { safeExternalUrl } from "./safe-url.js";
@@ -106,7 +106,7 @@ function MapLieChip(props) {
           event.stopPropagation();
           props.onMarkTee();
         },
-      }, marked.tee ? "Tee saved" : "Mark tee")
+      }, marked.tee ? "Tee saved" : (props.loose ? "Tee is here" : "Mark tee"))
       : null,
     typeof props.onMarkPin === "function"
       ? h("button", {
@@ -118,7 +118,7 @@ function MapLieChip(props) {
           event.stopPropagation();
           props.onMarkPin();
         },
-      }, marked.target ? "Pin saved" : "Mark pin")
+      }, marked.target ? "Basket saved" : (props.loose ? "Basket is here" : "Mark pin"))
       : null,
     typeof props.onMarkLie === "function"
       ? h("button", {
@@ -503,9 +503,10 @@ export function HoleMap(props) {
   const compact = Boolean(props.compact);
   const large = Boolean(props.large);
   const size = compact ? HOLE_MAP_COMPACT_SIZE : large ? HOLE_MAP_WATCH_SIZE : HOLE_MAP_SIZE;
-  const map = projectHoleMap(hole, {
+  const map = projectLooseHoleMap(hole, {
     focus: props.focus,
     height: size.height,
+    here: props.here,
     width: size.width,
     windFromDeg: props.windFromDeg,
   });
@@ -626,22 +627,26 @@ export function HoleMap(props) {
           h("text", { className: "hole-map-north", key: "north", x: 14, y: 22 }, "N"),
           h(CircleRing, { className: "hole-map-c2", key: "c2", ring: map.circle2 }),
           h(CircleRing, { className: "hole-map-c1", key: "c1", ring: map.circle1 }),
-          h("line", {
-            className: "hole-map-fairway-shadow",
-            key: "fairway-shadow",
-            x1: map.tee.x,
-            x2: map.basket.x,
-            y1: map.tee.y,
-            y2: map.basket.y,
-          }),
-          h("line", {
-            className: "hole-map-fairway",
-            key: "fairway",
-            x1: map.tee.x,
-            x2: map.basket.x,
-            y1: map.tee.y,
-            y2: map.basket.y,
-          }),
+          map.tee && map.basket
+            ? h("line", {
+              className: "hole-map-fairway-shadow",
+              key: "fairway-shadow",
+              x1: map.tee.x,
+              x2: map.basket.x,
+              y1: map.tee.y,
+              y2: map.basket.y,
+            })
+            : null,
+          map.tee && map.basket
+            ? h("line", {
+              className: "hole-map-fairway",
+              key: "fairway",
+              x1: map.tee.x,
+              x2: map.basket.x,
+              y1: map.tee.y,
+              y2: map.basket.y,
+            })
+            : null,
           ...groupGeometry.flatMap((group) => group.segs.map((seg) => h("line", {
             className: "hole-map-throw-line" + (group.active === false ? " is-muted" : ""),
             key: "throw-line-" + group.key + "-" + seg.n,
@@ -660,21 +665,25 @@ export function HoleMap(props) {
               y2: measureTo.y,
             })
             : null,
-          h(TeePad, {
-            compact,
-            key: "tee",
-            label: map.tee.label,
-            rotationDeg: map.teeRotationDeg,
-            x: map.tee.x,
-            y: map.tee.y,
-          }),
-          h(BasketMark, {
-            compact,
-            key: "basket",
-            label: map.basket.label,
-            x: map.basket.x,
-            y: map.basket.y,
-          }),
+          map.tee
+            ? h(TeePad, {
+              compact,
+              key: "tee",
+              label: map.tee.label,
+              rotationDeg: map.teeRotationDeg,
+              x: map.tee.x,
+              y: map.tee.y,
+            })
+            : null,
+          map.basket
+            ? h(BasketMark, {
+              compact,
+              key: "basket",
+              label: map.basket.label,
+              x: map.basket.x,
+              y: map.basket.y,
+            })
+            : null,
           map.windBlowToDeg == null ? null : h(WindMark, { deg: map.windBlowToDeg, key: "wind", x: map.width - 24, y: 24 }),
           ...players.map((player) => h(PlayerMark, {
             compact,
@@ -728,6 +737,7 @@ export function HoleMap(props) {
         key: "lie-chip",
         surveyed: props.surveyed,
         throws,
+        loose: map.loose,
         onMarkLie: props.onMarkLie,
         onMarkPin: props.onMarkPin,
         onMarkTee: props.onMarkTee,
@@ -736,9 +746,9 @@ export function HoleMap(props) {
       props.hud || null,
     ]),
     h("div", { className: "hole-map-caption", key: "caption" }, [
-      h("span", { key: "tee" }, map.tee.label),
-      h("span", { key: "dist" }, map.distanceFt ? `${map.distanceFt} ft` : "Map"),
-      h("span", { key: "basket" }, map.basket.label),
+      h("span", { key: "tee" }, map.tee ? map.tee.label : "You"),
+      h("span", { key: "dist" }, map.distanceFt ? `${map.distanceFt} ft` : (map.loose ? "Around you" : "Map")),
+      h("span", { key: "basket" }, map.basket ? map.basket.label : ""),
     ]),
     h("div", { className: "hole-map-credit", key: "credit" }, SATELLITE_CREDIT),
     udiscHref

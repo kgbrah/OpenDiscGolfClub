@@ -502,9 +502,13 @@ function markerSaved(hole, kind, surveyed) {
   return Boolean(surveyed && surveyed[kind]);
 }
 
+function pointReady(point) {
+  return Number.isFinite(Number(point && point.lat)) && Number.isFinite(Number(point && point.lng));
+}
+
 function HoleMedia(props) {
   const [signOpen, setSignOpen] = React.useState(false);
-  const hasMap = holeHasMap(props.hole);
+  const hasMap = holeHasMap(props.hole) || pointReady(props.hole && props.hole.tee) || pointReady(props.hole && props.hole.target) || pointReady(props.gpsFix);
   const hasSign = Boolean(props.teeSign);
   const canSurvey = typeof props.onMarkTee === "function" || typeof props.onMarkPin === "function";
   if (!hasMap && !hasSign && !canSurvey) return null;
@@ -548,6 +552,7 @@ function HoleMedia(props) {
           }),
           key: "map-card",
           lie: props.lie,
+          here: props.gpsFix,
           measureFrom: props.measureFrom,
           measureTo: props.measureTo,
           players: withSelfLocation(props.playerLocations, props.gpsFix, props.selfMark),
@@ -723,6 +728,17 @@ function ScoreRow(props) {
       h("div", { className: "pname", key: "name" }, row.label),
       row.meta ? h("div", { className: "pmeta", key: "meta" }, row.meta) : null,
       row.conflictText ? h("div", { className: "pmeta conflict-text", key: "conflict" }, row.conflictText) : null,
+      row.conflictValues && row.conflictValues.length
+        ? h("div", { className: "conflict-picks", key: "picks" }, row.conflictValues.map((value) =>
+          h("button", {
+            className: "btn small",
+            disabled: Boolean(props.locked),
+            key: value,
+            type: "button",
+            onClick: () => props.onScore(row.source, props.hole.hole, value),
+          }, "Use " + value),
+        ))
+        : null,
     ]),
     h("div", { className: "stepper", key: "stepper" }, [
       h(

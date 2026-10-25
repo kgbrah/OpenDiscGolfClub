@@ -626,6 +626,9 @@ export function buildScorecardViewState({ state, mode, roundCode, scorerIndex, t
     });
     return {
       conflictText: conflict ? "Conflict: " + (conflict.values || []).join(" vs ") + " - set yours to match" : "",
+      conflictValues: conflict && Array.isArray(conflict.values)
+        ? conflict.values.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+        : [],
       currentScore,
       honors: tee.honorsReady && order === 0,
       isMe,

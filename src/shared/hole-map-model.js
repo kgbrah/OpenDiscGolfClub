@@ -532,6 +532,78 @@ export function projectHoleMap(hole, options = {}) {
   };
 }
 
+const LOOSE_PAD_M = 90;
+
+function boundsAround(points, meters) {
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  for (const point of points) {
+    const dLat = meters / 111320;
+    const dLng = meters / (111320 * Math.max(Math.cos(point.lat * Math.PI / 180), 0.2));
+    minLat = Math.min(minLat, point.lat - dLat);
+    maxLat = Math.max(maxLat, point.lat + dLat);
+    minLng = Math.min(minLng, point.lng - dLng);
+    maxLng = Math.max(maxLng, point.lng + dLng);
+  }
+  return { minLat, maxLat, minLng, maxLng };
+}
+
+function uniquePoints(points) {
+  const out = [];
+  for (const point of points) {
+    if (!point) continue;
+    if (out.some((row) => Math.abs(row.lat - point.lat) < 1e-7 && Math.abs(row.lng - point.lng) < 1e-7)) continue;
+    out.push(point);
+  }
+  return out;
+}
+
+/** Satellite frame for a hole that does not have both a tee and a basket yet. */
+export function projectLooseHoleMap(hole, options = {}) {
+  const strict = projectHoleMap(hole, options);
+  if (strict) return strict;
+  const tee = holePoint(hole && hole.tee);
+  const basket = holePoint(hole && hole.target);
+  const here = holePoint(options.here);
+  const anchors = uniquePoints([tee, basket, here]);
+  if (!anchors.length) return null;
+  const width = finite(options.width) || 640;
+  const height = finite(options.height) || 360;
+  const bounds = anchors.length === 1
+    ? boundsAround(anchors, LOOSE_PAD_M)
+    : paddedBounds(
+      { lat: Math.min(...anchors.map((point) => point.lat)), lng: Math.min(...anchors.map((point) => point.lng)) },
+      { lat: Math.max(...anchors.map((point) => point.lat)), lng: Math.max(...anchors.map((point) => point.lng)) },
+    );
+  const place = (point, label) => (
+    point
+      ? { ...mapXy(bounds, width, height, point.lng, point.lat), lat: point.lat, lng: point.lng, label }
+      : null
+  );
+  const teePt = place(tee, (tee && tee.label) || "Tee");
+  const basketPt = place(basket, (basket && basket.label) || "Basket");
+  const windFrom = finite(options.windFromDeg);
+  return {
+    width,
+    height,
+    bounds,
+    focus: "hole",
+    loose: true,
+    satelliteUrl: satelliteImageUrl(bounds, width, height),
+    tee: teePt,
+    basket: basketPt,
+    headingDeg: tee && basket ? headingDeg(tee, basket) : null,
+    teeRotationDeg: teePt && basketPt ? teePadRotationDeg(teePt, basketPt) : 0,
+    distanceFt: tee && basket ? haversineFt(tee, basket) : (finite(hole && hole.distance_ft) || null),
+    windBlowToDeg: windBlowToDeg(windFrom),
+    windFromDeg: windFrom,
+    circle1: basketPt ? circleEllipse({ bounds, width, height, basket: basketPt }, CIRCLE1_M) : null,
+    circle2: basketPt ? circleEllipse({ bounds, width, height, basket: basketPt }, CIRCLE2_M) : null,
+  };
+}
+
 
 export function holeMapLabel(map, holeNumber) {
   if (!map) return "";

@@ -71,6 +71,25 @@ function DirectionsLink({ course, origin }) {
   );
 }
 
+const RECENT_ROUNDS_KEY = "gvdg_recent_rounds";
+
+function readRecentRounds() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(RECENT_ROUNDS_KEY) || "[]");
+    const seen = new Set();
+    return (Array.isArray(rows) ? rows : []).map((row) => ({
+      code: String(row && row.code || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
+      label: String(row && row.label || "").trim(),
+    })).filter((row) => {
+      if (row.code.length < 4 || seen.has(row.code)) return false;
+      seen.add(row.code);
+      return true;
+    }).slice(0, 4);
+  } catch {
+    return [];
+  }
+}
+
 function HomeView({ onStart, onJoin, onInvalidCode, onSignOut, onSignIn, onWatch, signedIn, playerName }) {
   const [joinCode, setJoinCode] = React.useState("");
   const submitJoin = () => {
@@ -78,6 +97,7 @@ function HomeView({ onStart, onJoin, onInvalidCode, onSignOut, onSignIn, onWatch
     if (code.length >= 4) onJoin(code);
     else onInvalidCode();
   };
+  const recent = readRecentRounds();
 
   return h("div", { className: "stack" }, [
     h("div", { className: "card stack", key: "card" }, [
@@ -121,6 +141,23 @@ function HomeView({ onStart, onJoin, onInvalidCode, onSignOut, onSignIn, onWatch
         { className: "btn ghost", type: "button", onClick: () => (joinCode.trim() ? onWatch(joinCode) : onInvalidCode()), key: "watchButton" },
         "Watch this round",
       ),
+      recent.length
+        ? h("div", { className: "stack", key: "recent" }, [
+          h("p", { className: "lbl", key: "label" }, "Jump back in"),
+          ...recent.map((row) => h("button", {
+            className: "tap-row",
+            key: row.code,
+            type: "button",
+            onClick: () => onJoin(row.code),
+          }, [
+            h("div", { className: "grow", key: "copy" }, [
+              h("div", { className: "title", key: "title" }, row.label && row.label !== row.code ? row.label : "Casual round"),
+              h("div", { className: "muted", key: "code" }, row.code),
+            ]),
+            h("div", { className: "chev", key: "chev" }, "Rejoin"),
+          ])),
+        ])
+        : null,
     ]),
     signedIn
       ? h(

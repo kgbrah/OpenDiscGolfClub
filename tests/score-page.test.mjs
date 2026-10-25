@@ -435,6 +435,7 @@ test('score view model derives rows, totals, conflicts, blockers, and UDisc expo
   assert.equal(view.teeOrderHint, 'Tee order: Ava King · then Milo Chen');
   assert.equal(view.rows[0].relative.text, '-1');
   assert.equal(view.rows[1].conflictText.includes('4 vs 5'), true);
+  assert.deepEqual(view.rows[1].conflictValues, [4, 5]);
   assert.deepEqual(view.totals, [
     { label: 'Thru', value: '1/2' },
     { label: 'Total', value: '2' },
