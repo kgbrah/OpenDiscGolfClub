@@ -246,7 +246,23 @@ function RoundTools(props) {
       },
       [icon(Share2), h("span", { key: "label" }, "Share")],
     ),
-    props.onWatchShare
+    props.onShareCode
+      ? h("button", {
+        "aria-label": "Share round code",
+        className: "score-glove-tool" + (copied ? " active" : ""),
+        key: "invite",
+        title: "Share round code",
+        type: "button",
+        onClick: () => {
+          props.onShareCode();
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1600);
+        },
+      }, [
+        icon(Link2),
+        h("span", { key: "label" }, copied ? "Shared" : "Invite"),
+      ])
+      : props.onWatchShare
       ? h("button", {
         "aria-label": "Copy watch link",
         className: "score-glove-tool" + (copied ? " active" : ""),
@@ -315,6 +331,14 @@ function HoleHeader(props) {
       h("div", { className: "hpar", key: "par" }, props.holeMeta),
       props.ctpBadge ? h("div", { className: "ctp-badge", key: "ctp" }, props.ctpBadge) : null,
       props.matchStatus ? h("div", { className: "pmeta", key: "match" }, props.matchStatus) : null,
+      props.roundCode && typeof props.onShareCode === "function"
+        ? h("button", {
+          className: "round-code-chip",
+          key: "code",
+          type: "button",
+          onClick: props.onShareCode,
+        }, `Code ${props.roundCode}`)
+        : null,
       props.teeOrderHint ? h("div", { className: "tee-order-hint", key: "tee" }, props.teeOrderHint) : null,
       props.dormie ? h("div", { className: "dormie-badge", key: "dormie" }, "DORMIE - win or halve this hole to close it") : null,
     ]),
@@ -470,6 +494,14 @@ function RangeHud(props) {
   ]);
 }
 
+function markerSaved(hole, kind, surveyed) {
+  const marker = hole && (kind === "tee" ? hole.tee : hole.target);
+  const lat = Number(marker && marker.lat);
+  const lng = Number(marker && marker.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return true;
+  return Boolean(surveyed && surveyed[kind]);
+}
+
 function HoleMedia(props) {
   const [signOpen, setSignOpen] = React.useState(false);
   const hasMap = holeHasMap(props.hole);
@@ -483,19 +515,19 @@ function HoleMedia(props) {
     ? h("div", { className: "hole-map-lie-actions hole-map-survey-empty", key: "survey" }, [
       typeof props.onMarkTee === "function"
         ? h("button", {
-          className: "hole-map-survey-btn" + (props.surveyed && props.surveyed.tee ? " active" : ""),
+          className: "hole-map-survey-btn" + (markerSaved(props.hole, "tee", props.surveyed) ? " active" : ""),
           key: "tee",
           type: "button",
           onClick: props.onMarkTee,
-        }, props.surveyed && props.surveyed.tee ? "Tee saved" : "Mark tee")
+        }, markerSaved(props.hole, "tee", props.surveyed) ? "Tee saved" : "Tee is here")
         : null,
       typeof props.onMarkPin === "function"
         ? h("button", {
-          className: "hole-map-survey-btn" + (props.surveyed && props.surveyed.target ? " active" : ""),
+          className: "hole-map-survey-btn" + (markerSaved(props.hole, "target", props.surveyed) ? " active" : ""),
           key: "pin",
           type: "button",
           onClick: props.onMarkPin,
-        }, props.surveyed && props.surveyed.target ? "Pin saved" : "Mark pin")
+        }, markerSaved(props.hole, "target", props.surveyed) ? "Basket saved" : "Basket is here")
         : null,
     ])
     : null;
@@ -534,8 +566,8 @@ function HoleMedia(props) {
       : h("div", { className: "hole-media-empty", key: "empty" }, [
         h("span", { key: "copy" }, "No map for this hole yet"),
         canSurvey
-          ? h("span", { className: "hole-media-empty-hint", key: "hint" }, "Stand on the tee or at the basket and mark it")
-          : null,
+          ? h("span", { className: "hole-media-empty-hint", key: "hint" }, props.gpsStatus === "watching" ? "Getting your location…" : "Stand on it, then tap once.")
+          : h("span", { className: "hole-media-empty-hint", key: "hint" }, "Sign in to drop the tee and basket."),
         surveyBtns,
       ]),
     hasSign

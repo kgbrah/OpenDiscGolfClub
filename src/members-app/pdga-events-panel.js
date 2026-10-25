@@ -2,6 +2,8 @@ import React from "react";
 
 import { requestJson } from "./api.js";
 import { currentDashboardTab } from "./dashboard-router.js";
+import { AddToCalendarButton } from "../shared/add-to-calendar.js";
+import { calendarEventFromPdga } from "../shared/event-calendar.js";
 
 const h = React.createElement;
 const CLUB_ORIGIN = { lat: 35.6127, lng: -77.3664 };
@@ -40,13 +42,16 @@ function EventCard({ event }) {
     ]),
     h("p", { className: "register-date", key: "date" }, [event.date, event.tier].filter(Boolean).join(" · ")),
     where ? h("p", { className: "pdga-event-where", key: "where" }, where) : null,
-    h("div", { className: "register-actions", key: "actions" },
+    h("div", { className: "register-actions", key: "actions" }, [
       h("a", {
         className: "passkey-btn",
         href: event.url,
+        key: "register",
         rel: "noopener noreferrer",
         target: "_blank",
-      }, "Register")),
+      }, "Register"),
+      h(AddToCalendarButton, { item: calendarEventFromPdga(event), key: "cal" }),
+    ]),
   ]);
 }
 

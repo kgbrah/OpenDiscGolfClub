@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+test("a live round can be shared by code and an unmapped hole can be pinned", () => {
+  const view = readFileSync("src/score-app/scorecard-view.js", "utf8");
+  const controller = readFileSync("src/score-app/score-controller.js", "utf8");
+  const home = readFileSync("src/members-app/overview-dashboard.js", "utf8");
+  assert.match(view, /Share round code/);
+  assert.match(view, /Tee is here/);
+  assert.match(view, /Basket is here/);
+  assert.match(view, /Sign in to drop the tee and basket/);
+  assert.match(controller, /function shareJoinCode\(\)/);
+  assert.match(controller, /Join my card — code /);
+  assert.match(controller, /onShareCode: ROUND_CODE \? shareJoinCode : null/);
+  assert.match(home, /function NextPdgaCard/);
+  assert.match(home, /data-react-home-pdga/);
+  assert.match(readFileSync("src/members-app/pdga-events-panel.js", "utf8"), /AddToCalendarButton/);
+  assert.match(readFileSync("src/members-app/registration-events.js", "utf8"), /calendarEventFromClub/);
+});

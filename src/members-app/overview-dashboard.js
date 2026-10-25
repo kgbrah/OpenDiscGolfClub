@@ -13,6 +13,8 @@ import { eventMeta, pickUpNext } from "./registration-utils.js";
 import { latestHomeRound } from "./play-page-model.js";
 import { EventScheduleFacts } from "../shared/event-schedule.js";
 import { EventFieldRoster } from "../shared/event-field-roster.js";
+import { AddToCalendarButton } from "../shared/add-to-calendar.js";
+import { calendarEventFromClub, calendarEventFromPdga } from "../shared/event-calendar.js";
 
 const h = React.createElement;
 
@@ -102,6 +104,52 @@ function UpNextCard({ events, registrations }) {
       },
       key: "register",
     }, actionLabel),
+    h(AddToCalendarButton, { className: "player-btn", item: calendarEventFromClub(event), key: "cal" }),
+  ]);
+}
+
+const CLUB_ORIGIN = { lat: 35.6127, lng: -77.3664 };
+
+function NextPdgaCard() {
+  const [event, setEvent] = React.useState(null);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    const query = `/pdga-events?lat=${encodeURIComponent(CLUB_ORIGIN.lat)}&lng=${encodeURIComponent(CLUB_ORIGIN.lng)}`;
+    requestJson(query, { signal: controller.signal })
+      .then((data) => {
+        const events = Array.isArray(data?.events) ? data.events : [];
+        setEvent(events[0] || null);
+      })
+      .catch((error) => {
+        if (error?.name !== "AbortError") setEvent(null);
+      });
+    return () => controller.abort();
+  }, []);
+
+  if (!event) return null;
+  const miles = typeof event.miles === "number" ? `${event.miles.toFixed(1)} mi` : "";
+  const meta = [event.date, event.course, miles].filter(Boolean).join(" · ");
+  return h("div", { className: "player-story-block", "data-react-home-pdga": "ready", key: "pdga" }, [
+    h("h3", { key: "title" }, "Next PDGA"),
+    h("div", { className: "player-event-name", key: "name" }, event.name),
+    meta ? h("div", { className: "player-card-meta", key: "meta" }, meta) : null,
+    h("div", { className: "player-actions", key: "actions" }, [
+      h("a", {
+        className: "player-btn primary",
+        href: event.url,
+        key: "register",
+        rel: "noopener noreferrer",
+        target: "_blank",
+      }, "Register"),
+      h(AddToCalendarButton, { className: "player-btn", item: calendarEventFromPdga(event), key: "cal" }),
+      h("button", {
+        className: "player-btn",
+        key: "all",
+        type: "button",
+        onClick: () => selectDashboardTab("events"),
+      }, "All events"),
+    ]),
   ]);
 }
 
@@ -219,6 +267,7 @@ export function MemberOverviewDashboard() {
       h(RatingMove, { stats: pdgaState.stats, status: pdgaState.status }),
       h(LastRoundCard, { token }),
       h(UpNextCard, { events: registration.state.events, registrations: registration.state.registrations }),
+      h(NextPdgaCard),
       h(PdgaHistory, { stats: pdgaState.stats }),
     ]),
     h(PlayStatsPanel, { compact: true, key: "play-stats", pdgaStats: pdgaState.stats }),

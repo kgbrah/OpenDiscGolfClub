@@ -762,7 +762,8 @@ export function startScoreApp(options) {
                 onAgreeFinish: agreeFinish,
                 onScorerChange: function (index) { S.scorerIndex = index; renderHole(); },
                 onShare: shareRound,
-                onWatchShare: ROUND_CODE || EVENT_ID ? shareWatchLink : null,
+                onShareCode: ROUND_CODE ? shareJoinCode : null,
+                onWatchShare: !ROUND_CODE && EVENT_ID ? shareWatchLink : null,
             });
         }
 
@@ -1159,6 +1160,23 @@ export function startScoreApp(options) {
                 return;
             }
             toast(ROUND_CODE ? ("Code: " + ROUND_CODE) : payload.url);
+        }
+        function shareJoinCode() {
+            if (!ROUND_CODE) { shareWatchLink(); return; }
+            const join = location.origin + location.pathname + "?round=" + ROUND_CODE;
+            const watch = location.origin + location.pathname + "?round=" + ROUND_CODE + "&watch=1";
+            const text = "Join my card — code " + ROUND_CODE + "\nWatch: " + watch;
+            const payload = { title: "GVDG round " + ROUND_CODE, text: text, url: join };
+            if (navigator.share) {
+                navigator.share(payload).catch(function () {});
+                return;
+            }
+            const full = text + "\n" + join;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(full).then(function () { toast("Code " + ROUND_CODE + " copied"); }).catch(function () { toast(ROUND_CODE); });
+                return;
+            }
+            toast("Code " + ROUND_CODE);
         }
         function watchHref() {
             return liveWatchHref({ eventId: EVENT_ID, roundCode: ROUND_CODE });
