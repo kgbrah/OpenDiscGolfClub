@@ -6,6 +6,13 @@ import { nextCircularIndex, useAnimatedCount, useRevealOnce, useSwipe } from "./
 const h = React.createElement;
 
 const HERO_SLIDES = 5;
+const FACEBOOK_GROUP_URL = "https://www.facebook.com/groups/243452675724939";
+
+const CLUB_RHYTHM = [
+  { kicker: "Every week", title: "Doubles", detail: "Show up and get a card." },
+  { kicker: "Every month", title: "Tournaments", detail: "Club events, all ratings." },
+  { kicker: "The big one", title: "Players Cup", detail: "PDGA A-tier. Down East." },
+];
 
 const ABOUT_PARAGRAPHS = [
   "Greenville Disc Golf Club has been putting plastic in the trees of Eastern North Carolina since 2004. Weekly doubles, monthly tournaments, and the Down East Players Cup — a PDGA A-tier — all live here.",
@@ -122,11 +129,30 @@ export function HomeHeroSection() {
         type: "button",
       }))),
     h("div", { className: "hero-content", key: "content" }, [
+      h("p", { className: "hero-kicker", key: "kicker" }, "Eastern North Carolina · since 2004"),
       h("h1", { className: "hero-title", key: "title" }, "Greenville Disc Golf Club"),
-      h("p", { className: "hero-subtitle", key: "subtitle" }, "Start a card on a local course. No club login."),
+      h("p", { className: "hero-subtitle", key: "subtitle" }, "Five courses in town. Weekly doubles. A card for your first putt or a rated round."),
       h("div", { className: "hero-actions", key: "cta" }, [
-        h("a", { className: "cta-button", href: "score.html", key: "score" }, "Keep score"),
-        h("a", { className: "cta-button cta-button-ghost", href: "#membership", key: "join" }, "Join the Club"),
+        h("a", { className: "cta-button", href: "#courses", key: "courses" }, "Where we play"),
+        h("a", { className: "cta-button cta-button-ghost", href: "#membership", key: "join" }, "Join the club"),
+        h("a", { className: "hero-score-link", href: "score.html", key: "score" }, "Keep score"),
+      ]),
+      h("div", { className: "club-rhythm", key: "rhythm", "aria-label": "How the club plays" }, [
+        ...CLUB_RHYTHM.map((item) => h("div", { className: "rhythm-card", key: item.title }, [
+          h("div", { className: "rhythm-kicker", key: "kicker" }, item.kicker),
+          h("div", { className: "rhythm-title", key: "title" }, item.title),
+          h("p", { className: "rhythm-detail", key: "detail" }, item.detail),
+        ])),
+        h("a", {
+          className: "club-group-link",
+          href: FACEBOOK_GROUP_URL,
+          key: "group",
+          rel: "noopener noreferrer",
+          target: "_blank",
+        }, [
+          h("span", { key: "copy" }, "Lost discs, rain calls, who's playing"),
+          h("strong", { key: "go" }, "Facebook group"),
+        ]),
       ]),
     ]),
   ]);

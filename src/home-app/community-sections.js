@@ -80,12 +80,12 @@ export function HomeMembershipSection() {
         key: "cta",
         rel: "noopener noreferrer",
         target: "_blank",
-      }, "Pay $15 dues"),
-      h("a", {
-        className: "cta-button cta-button-ghost",
-        href: "gvdg-members.html#apply",
-        key: "apply",
-      }, "Create your app login"),
+      }, "Join for $15 a year"),
+    ]),
+    h("p", { className: "membership-next", key: "next" }, [
+      "PayPal takes the dues. Then ",
+      h("a", { href: "gvdg-members.html#apply", key: "login" }, "create your app login"),
+      ".",
     ]),
   ]);
 }
@@ -105,8 +105,7 @@ export function HomeContactSection() {
         h("div", { className: "contact-icon", key: "icon" }, icon(Smartphone)),
         h("div", { className: "contact-label", key: "label" }, "Follow Us"),
         h("div", { className: "contact-detail", key: "detail" }, [
-          h("a", { href: facebookUrl, key: "facebook", rel: "noopener noreferrer", target: "_blank" }, "@GreenvilleDGC on Facebook"),
-          " & Instagram",
+          h("a", { href: facebookUrl, key: "facebook", rel: "noopener noreferrer", target: "_blank" }, "Facebook group"),
         ]),
       ]),
       h(ContactBox, { delay: 300, key: "location" }, [

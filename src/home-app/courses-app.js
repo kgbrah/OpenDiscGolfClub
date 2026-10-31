@@ -46,6 +46,7 @@ const COURSE_SLIDES = [
         rating: "4.3",
         time: "~1 hr",
         description: "Five layouts available! Great mix of open and wooded shots.",
+        startHere: true,
       },
       {
         course: "Covenant Church",
@@ -454,7 +455,10 @@ function CourseCard({ course, condition }) {
       h(CourseImage, { course, condition, key: "image" }),
       h("div", { className: "course-content", key: "content" }, [
         h("div", { className: "course-header", key: "header" }, [
-          h("h3", { className: "course-name", key: "name" }, course.name),
+          h("div", { key: "name-wrap" }, [
+            course.startHere ? h("div", { key: "start" }, h("span", { className: "course-start" }, "Start here")) : null,
+            h("h3", { className: "course-name", key: "name" }, course.name),
+          ]),
           h("span", { className: `difficulty-badge ${course.difficultyClass}`, key: "difficulty" }, course.difficulty),
         ]),
         h("div", { className: "course-location", key: "location" }, [
@@ -575,6 +579,10 @@ export function HomeCoursesApp() {
   }
 
   return h("div", { "data-react-home-courses": "ready" }, [
+    h("div", { className: "courses-lead", key: "lead" }, [
+      h("h2", { key: "title" }, "Where to play"),
+      h("p", { key: "copy" }, "New in town? Start at West Meadowbrook. Five layouts, open and wooded, right in Greenville."),
+    ]),
     h("div", {
       className: "courses-carousel-container",
       key: "container",

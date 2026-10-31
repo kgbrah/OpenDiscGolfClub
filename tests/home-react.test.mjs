@@ -15,7 +15,7 @@ test('homepage feeds are rendered by the home React bundle', () => {
   assert.match(html, /id="homeReactTournamentsApp"/);
   assert.match(html, /<div id="homeReactEventsApp"><\/div>/);
   assert.match(html, /<div id="homeReactTournamentsApp"><\/div>/);
-  assert.match(html, /<script type="module" src="home-app\/home-app\.js\?v=179"><\/script>/);
+  assert.match(html, /<script type="module" src="home-app\/home-app\.js\?v=180"><\/script>/);
   assert.doesNotMatch(html, /<script type="module" src="home-feeds\.js"><\/script>/);
   assert.doesNotMatch(html, /<div id="homeReactEventsApp"><div class="event-list">/);
   assert.doesNotMatch(html, /<div id="homeReactTournamentsApp"><div class="tournament-list">/);
@@ -109,7 +109,8 @@ test('home React bundle owns membership contact and footer sections', () => {
   assert.match(main, /createRoot\(footerMount\)\.render\(h\(HomeFooter\)\)/);
   assert.match(community, /export function HomeMembershipSection/);
   assert.match(community, /gvdg-members\.html#apply/);
-  assert.match(community, /Create your app login/);
+  assert.match(community, /Join for \$15 a year/);
+  assert.match(community, /create your app login/);
   assert.match(community, /export function HomeContactSection/);
   assert.match(community, /export function HomeFooter/);
   assert.match(community, /data-react-home-membership/);
@@ -117,7 +118,6 @@ test('home React bundle owns membership contact and footer sections', () => {
   assert.match(community, /data-react-home-footer/);
   assert.match(community, /footer-links/);
   assert.match(community, /href: "score.html"/);
-  assert.match(community, /cta-button-ghost/);
   assert.match(community, /safeExternalUrl/);
   assert.match(community, /Trophy/);
   assert.match(community, /MessageCircle/);
@@ -163,7 +163,7 @@ test('home React bundle owns hero and about sections', () => {
   assert.match(heroAbout, /useSwipe/);
   assert.match(heroAbout, /useAnimatedCount/);
   assert.match(heroAbout, /prefers-reduced-motion/);
-  assert.match(heroAbout, /Start a card on a local course/);
+  assert.match(heroAbout, /Five courses in town/);
   assert.match(heroAbout, /Meet Our Board/);
   assert.match(heroAbout, /board-members-grid/);
   assert.match(heroAbout, /value: 22/);

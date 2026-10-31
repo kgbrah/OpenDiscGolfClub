@@ -7,6 +7,7 @@ const h = React.createElement;
 
 export const SITE_NAV_HOME = { label: "Home", href: "index.html", page: "index" };
 export const SITE_NAV_PRIMARY = [
+  { label: "Courses", href: "index.html#courses", page: "courses" },
   { label: "Keep score", href: "score.html", page: "score" },
   { label: "Events", href: "events.html", page: "events" },
   { label: "Pro Shop", href: "pro-shop.html", page: "pro-shop" },
