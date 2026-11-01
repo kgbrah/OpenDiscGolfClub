@@ -20,7 +20,7 @@ import {
     startingHoleForState,
     udiscExportData,
 } from "./score-view-model.js";
-import { rememberLastCourse } from "./course-pick.js";
+import { layoutHoles, matchCourseByName, rememberLastCourse, sortLayoutsForPick } from "./course-pick.js";
 import { resolveApiBase } from "../shared/api-base.js";
 import { clearMemberSession, readMemberToken, writeMemberSession } from "../shared/member-session.js";
 import { createWakeLock } from "../shared/wake-lock.js";
@@ -50,6 +50,7 @@ export function startScoreApp(options) {
         const EVENT_ID = (params.get('event') || '').replace(/[^0-9]/g, '');
         const ROUND_CODE = liveRoundCodeFromSearch(params);
         const MODE = ROUND_CODE ? 'round' : (EVENT_ID ? 'event' : 'home'); // event scoring · casual round · home
+        const COURSE_QUERY = MODE === 'home' ? String(params.get('course') || '').trim() : '';
         const WATCH = isLiveWatchRequest(params);
         const LIVE = ROUND_CODE ? ('/rounds/' + ROUND_CODE + '/live') : ('/events/' + EVENT_ID + '/live');
         // A guest scores an EVENT via their registration token (URL ?gt= or saved at registration).
@@ -970,6 +971,39 @@ export function startScoreApp(options) {
                 onSignIn: function () { renderLogin(); }
             });
         }
+        async function renderCourseMap(query) {
+            renderLoading();
+            const listed = await api('/courses', { auth: false });
+            const courses = (listed.ok && listed.data && listed.data.courses) || [];
+            const course = matchCourseByName(courses, query);
+            if (!course) {
+                toast('That course is not in the club app yet.');
+                renderHome();
+                return;
+            }
+            const layoutRes = await api('/courses/' + encodeURIComponent(course.id) + '/layouts', { auth: false });
+            const layouts = sortLayoutsForPick((layoutRes.ok && layoutRes.data && layoutRes.data.layouts) || []);
+            const layout = layouts[0] || null;
+            const holes = layoutHoles(layout).filter((hole) => hole && hole.tee && hole.target);
+            let holeIndex = 0;
+            const paint = () => {
+                renderSetupFlow({
+                    view: 'courseMap',
+                    course: course,
+                    layout: layout,
+                    holes: holes,
+                    holeIndex: holeIndex,
+                    missing: !holes.length,
+                    onHole: function (index) { holeIndex = index; paint(); },
+                    onBack: function () { history.replaceState(null, '', 'score.html'); renderHome(); },
+                    onStart: function () {
+                        if (!hasScoringIdentity()) { renderOpenPlay(function () { renderLayoutPick(course); }); return; }
+                        renderLayoutPick(course);
+                    },
+                });
+            };
+            paint();
+        }
         function startCasualSetup() {
             if (!hasScoringIdentity()) { renderOpenPlay(function () { renderCoursePick(); }); return; }
             renderCoursePick();
@@ -1264,7 +1298,11 @@ export function startScoreApp(options) {
                 await loadWatch();
                 return;
             }
-            if (MODE === 'home') { renderHome(); return; }
+            if (MODE === 'home') {
+                if (COURSE_QUERY) { renderCourseMap(COURSE_QUERY); return; }
+                renderHome();
+                return;
+            }
             if (MODE === 'event' && !memberToken() && !GUEST_TOKEN) { renderLogin(); return; }
             if (MODE === 'round' && !hasScoringIdentity()) { renderOpenPlay(); return; }
             renderLoading();

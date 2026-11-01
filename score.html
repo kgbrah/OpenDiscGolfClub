@@ -378,7 +378,9 @@
         }
         .watch-hole-chip.won { border-color: var(--under); }
         .watch-hole-chip.lost { border-color: var(--over); }
-        .watch-hole-chip.halved { border-color: var(--even); }
+        .course-map-holes { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.15rem; -webkit-overflow-scrolling: touch; }
+        .course-map-holes .watch-hole-chip { flex: 0 0 auto; min-width: 44px; min-height: 44px; justify-content: center; }
+        .course-map-holes .watch-hole-chip.on { border-color: var(--accent); color: var(--text-primary); }
         .hole-map-wind { color: var(--accent); }
         .hole-map-focus {
             position: absolute; top: 0.4rem; left: 0.4rem; z-index: 5;
@@ -1063,6 +1065,6 @@
     <div id="scoreReactLeaderboardSheetApp"></div>
     <div id="scoreReactManagePlayersSheetApp"></div>
     <div id="scoreReactDialogsApp"></div>
-    <script type="module" src="score-app/score-app.js?v=188"></script>
+    <script type="module" src="score-app/score-app.js?v=189"></script>
 </body>
 </html>

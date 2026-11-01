@@ -7,6 +7,8 @@ import {
   filterCoursesForPick,
   googleMapsDirectionsUrl,
   layoutHasMap,
+  courseMapHref,
+  matchCourseByName,
   milesFromOrigin,
   readLastCourse,
   rememberLastCourse,
@@ -79,6 +81,18 @@ test("sortLayoutsForPick puts tee/pin layouts first", () => {
     holes: [{ hole: 1, par: 3, tee: { lat: 35.6, lng: -77.37 }, target: { lat: 35.601, lng: -77.37 } }],
   };
   assert.deepEqual(sortLayoutsForPick([bare, mapped]).map((row) => row.name), ["Long", "Default (par 3s)"]);
+});
+
+test("course map links open the club app by course name", () => {
+  assert.equal(courseMapHref("West Meadowbrook Park"), "score.html?course=West%20Meadowbrook%20Park");
+  assert.equal(courseMapHref(""), "score.html");
+  const courses = [
+    { id: 2, name: "West Meadowbrook Park" },
+    { id: 9, name: "The Oakwood Eagles' Nest" },
+  ];
+  assert.equal(matchCourseByName(courses, "west meadowbrook park").id, 2);
+  assert.equal(matchCourseByName(courses, "Oakwood").id, 9);
+  assert.equal(matchCourseByName(courses, "UDisc"), null);
 });
 
 test("course distances and range rings use the supplied origin, not a hardcoded club", () => {

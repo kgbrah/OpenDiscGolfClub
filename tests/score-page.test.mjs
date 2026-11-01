@@ -229,7 +229,8 @@ test('score setup screens are React-owned without legacy DOM fallbacks', () => {
   assert.match(setup, /Watch this round/);
   assert.match(setup, /onWatch\(joinCode\)/);
   assert.match(controller, /onWatch: watchRoundCode/);
-  assert.match(setup, /export function ScoreSetupFlow\(props\)/);
+  assert.match(setup, /case \"courseMap\"/);
+  assert.match(controller, /renderCourseMap\(COURSE_QUERY\)/);
   assert.doesNotMatch(legacy, /const row = el\('button', 'tap-row'\)/);
   assert.doesNotMatch(legacy, /const btn = el\('button', 'setup-option'\)/);
   assert.doesNotMatch(legacy, /selected\[group\.key\] = opt\.value/);
@@ -249,7 +250,7 @@ test('score auth screens are React-owned without legacy DOM fallbacks', () => {
   assert.match(controller, /\/rounds\/open-play/);
   assert.match(controller, /openPlayAvailable: MODE !== 'event'/);
   assert.match(controller, /function startOpenPlay\(/);
-  assert.match(controller, /if \(MODE === 'home'\) \{ renderHome\(\); return; \}/);
+  assert.match(controller, /if \(COURSE_QUERY\) \{ renderCourseMap\(COURSE_QUERY\); return; \}/);
   assert.match(controller, /readOpenPlayToken/);
   assert.doesNotMatch(controller, /casual\s+rounds are members-only/);
   assert.match(auth, /KeyRound/);

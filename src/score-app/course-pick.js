@@ -42,7 +42,7 @@ export function milesFromOrigin(course, origin) {
   return 2 * 3958.8 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export function layoutHasMap(layout) {
+export function layoutHoles(layout) {
   let holes = layout && layout.holes;
   if (typeof holes === "string") {
     try {
@@ -51,8 +51,15 @@ export function layoutHasMap(layout) {
       holes = [];
     }
   }
-  if (!Array.isArray(holes)) return false;
-  return holes.some((hole) => {
+  if (!Array.isArray(holes)) return [];
+  return holes.map((hole, index) => ({
+    ...hole,
+    hole: Number(hole && (hole.hole || hole.number)) || index + 1,
+  }));
+}
+
+export function layoutHasMap(layout) {
+  return layoutHoles(layout).some((hole) => {
     const tee = hole && hole.tee;
     const target = hole && hole.target;
     return (
@@ -62,6 +69,20 @@ export function layoutHasMap(layout) {
       finiteCoord(target && target.lng) != null
     );
   });
+}
+
+export function courseMapHref(name) {
+  const label = String(name || "").trim();
+  return label ? "score.html?course=" + encodeURIComponent(label) : "score.html";
+}
+
+export function matchCourseByName(courses, query) {
+  const needle = String(query || "").trim().toLowerCase();
+  if (!needle) return null;
+  const rows = Array.isArray(courses) ? courses : [];
+  return rows.find((course) => String(course && course.name || "").trim().toLowerCase() === needle)
+    || rows.find((course) => String(course && course.name || "").toLowerCase().includes(needle))
+    || null;
 }
 
 export function courseHasMap(course) {

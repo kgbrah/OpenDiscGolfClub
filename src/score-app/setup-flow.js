@@ -15,6 +15,7 @@ import {
   sortLayoutsForPick,
   teeSignCaptureHref,
 } from "./course-pick.js";
+import { HoleMap } from "../shared/hole-map.js";
 import { safeExternalUrl } from "../shared/safe-url.js";
 
 const h = React.createElement;
@@ -433,12 +434,35 @@ function SetupPickView({ layout, defaultConfig, notice, onBack, onCreate }) {
   ]);
 }
 
+function CourseMapView({ course, holes, holeIndex, layout, missing, onBack, onHole, onStart }) {
+  const hole = holes[holeIndex] || null;
+  return h("div", { className: "stack" }, [
+    h(BackButton, { onBack, key: "back" }),
+    h("h2", { className: "section", key: "title" }, course && course.name ? course.name : "Course map"),
+    h("p", { className: "muted", key: "layout" }, layout && layout.name ? layout.name : "Club hole map"),
+    missing
+      ? h("p", { className: "muted", key: "missing" }, "This course has no hole map in the club app yet. You can still start a round.")
+      : h(HoleMap, { hole, key: "map", layoutId: layout && (layout.id || layout.layout_id) }),
+    holes.length
+      ? h("div", { className: "course-map-holes", key: "holes" }, holes.map((row, index) => h("button", {
+        className: "watch-hole-chip" + (index === holeIndex ? " on" : ""),
+        key: row.hole,
+        type: "button",
+        onClick: () => onHole(index),
+      }, String(row.hole))))
+      : null,
+    h("button", { className: "btn", key: "start", type: "button", onClick: onStart }, "Start a round here"),
+  ]);
+}
+
 export function ScoreSetupFlow(props) {
   switch (props.view) {
     case "home":
       return h(HomeView, props);
     case "coursePick":
       return h(CoursePickView, props);
+    case "courseMap":
+      return h(CourseMapView, props);
     case "layoutPick":
       return h(LayoutPickView, props);
     case "setupPick":
