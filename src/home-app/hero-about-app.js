@@ -11,11 +11,11 @@ const FACEBOOK_GROUP_URL = "https://www.facebook.com/groups/243452675724939";
 const CLUB_RHYTHM = [
   { kicker: "Every week", title: "Doubles", detail: "Show up and get a card." },
   { kicker: "Every month", title: "Tournaments", detail: "Club events, all ratings." },
-  { kicker: "The big one", title: "Players Cup", detail: "PDGA A-tier. Down East." },
+  { kicker: "The big one", title: "Down East Player's Cup", detail: "Biggest tournament of the year. Pros come to play." },
 ];
 
 const ABOUT_PARAGRAPHS = [
-  "Greenville Disc Golf Club has been putting plastic in the trees of Eastern North Carolina since 2004. Weekly doubles, monthly tournaments, and the Down East Players Cup — a PDGA A-tier — all live here.",
+  "Greenville Disc Golf Club has been putting plastic in the trees of Eastern North Carolina since 2004. Weekly doubles, monthly tournaments, and the Down East Player's Cup — the biggest tournament of the year — all live here.",
   "Scholarships for Pitt County seniors. Five local courses. First putt or rated round, there's a card for you.",
 ];
 
