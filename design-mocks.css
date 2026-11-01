@@ -1,0 +1,267 @@
+/* Two homepage directions. No forest wallpaper. Tokens only. */
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: Archivo, system-ui, sans-serif;
+  line-height: 1.5;
+}
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+.wrap { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; }
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+  border-bottom: 1px solid var(--border-color);
+  backdrop-filter: blur(16px);
+}
+.brand { display: flex; align-items: center; gap: 0.55rem; text-decoration: none; min-width: 0; }
+.brand img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.brand strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: 400;
+  font-size: 1.35rem;
+  letter-spacing: 0.06em;
+}
+.brand em { font-style: normal; color: var(--accent); }
+.links { display: flex; gap: 1.1rem; align-items: center; }
+.links a { text-decoration: none; font-size: 0.92rem; font-weight: 650; color: var(--text-secondary); }
+.links a:hover { color: var(--primary-strong); }
+.switch { display: flex; gap: 0.35rem; }
+.switch a {
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  color: var(--text-secondary);
+}
+.switch a.on { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 1.2rem;
+  border-radius: 999px;
+  background: var(--primary-strong);
+  color: var(--light);
+  text-decoration: none;
+  font-weight: 800;
+}
+.btn.quiet {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+.kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+h1 {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: 400;
+  font-size: clamp(3rem, 7vw, 5.6rem);
+  line-height: 0.88;
+  letter-spacing: 0.02em;
+}
+.lede { font-size: 1.08rem; color: var(--text-secondary); max-width: 36rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.2rem; }
+
+.rhythm { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 1.6rem; }
+.rhythm article { border-top: 2px solid var(--primary); padding-top: 0.55rem; }
+.rhythm b {
+  display: block;
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: 400;
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.rhythm span { color: var(--text-muted); font-size: 0.9rem; }
+
+.courses { padding: 3.5rem 0 1rem; }
+.courses h2, .join h2 {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.feature {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 1.25rem;
+  margin-top: 1.4rem;
+  align-items: stretch;
+}
+.feature img { width: 100%; height: 100%; min-height: 280px; object-fit: cover; border-radius: 18px; }
+.feature-copy {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 1.4rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.tag {
+  align-self: flex-start;
+  background: var(--accent);
+  color: var(--disc-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  margin-bottom: 0.7rem;
+}
+.rows { margin-top: 0.8rem; }
+.rows a {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: baseline;
+  text-decoration: none;
+  padding: 0.95rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.rows a:hover { color: var(--primary-strong); }
+.rows small { color: var(--text-muted); }
+
+.join { padding: 2rem 0 4rem; }
+.ticket {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  gap: 1rem;
+  background: var(--secondary);
+  color: var(--light);
+  border-radius: 22px;
+  padding: 1.6rem;
+}
+.ticket p { color: color-mix(in srgb, var(--light) 82%, transparent); }
+.ticket .price {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 4.5rem;
+  line-height: 0.85;
+  color: var(--accent);
+}
+.ticket .side { display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 0.7rem; }
+.fine { color: color-mix(in srgb, var(--light) 78%, transparent); font-size: 0.92rem; }
+.fine a { color: var(--accent); font-weight: 800; }
+
+.foot { padding: 0 0 2rem; color: var(--text-muted); font-size: 0.9rem; }
+.foot a { color: var(--secondary-text); font-weight: 700; }
+
+.dock { display: none; }
+
+.field .stage {
+  display: grid;
+  grid-template-columns: 1.25fr 0.9fr;
+  min-height: calc(100svh - 64px);
+  background: var(--bg-primary);
+}
+.field .photo {
+  background: url("img/slide4.jpg") center 40% / cover no-repeat;
+  min-height: 64vh;
+}
+.field .copy { padding: 2.5rem 2rem 2rem; display: flex; flex-direction: column; justify-content: flex-end; }
+
+.night { background: var(--bg-primary); }
+.night .stage {
+  min-height: 100svh;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  padding: 5.5rem 0 2rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 8%, transparent) 20%, var(--bg-primary)),
+    url("img/slide2.jpg") center 30% / cover no-repeat;
+}
+.night .copy { width: min(1120px, calc(100% - 2rem)); }
+.night h1, .night .lede { color: var(--light); text-shadow: 0 2px 18px color-mix(in srgb, var(--dark) 70%, transparent); }
+.night .rhythm article { border-top-color: var(--accent); }
+.night .rhythm b, .night .rhythm span { color: var(--light); }
+.night .btn.quiet { color: var(--light); border-color: color-mix(in srgb, var(--light) 55%, transparent); }
+.night .top { background: color-mix(in srgb, var(--bg-primary) 72%, transparent); }
+
+.chooser { min-height: 100svh; display: grid; grid-template-columns: 1fr 1fr; }
+.chooser a {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2rem;
+  text-decoration: none;
+  color: var(--light);
+  background-size: cover;
+  background-position: center;
+}
+.chooser a span { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.chooser a strong {
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: 400;
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  line-height: 0.9;
+  letter-spacing: 0.03em;
+}
+.chooser a em { font-style: normal; max-width: 22rem; color: var(--light); }
+.chooser .field-pick {
+  background-image: linear-gradient(180deg, transparent, color-mix(in srgb, var(--dark) 78%, transparent)), url("img/slide4.jpg");
+}
+.chooser .night-pick {
+  background-image: linear-gradient(180deg, transparent, color-mix(in srgb, var(--dark) 78%, transparent)), url("img/slide2.jpg");
+}
+
+@media (max-width: 800px) {
+  .links { display: none; }
+  .field .stage, .feature, .ticket, .chooser { grid-template-columns: 1fr; }
+  .field .photo { min-height: 32vh; }
+  .field .copy { padding: 1.4rem 1rem 0.4rem; }
+  .rhythm { display: flex; overflow-x: auto; gap: 0.8rem; padding-bottom: 0.3rem; }
+  .rhythm article { min-width: 11rem; }
+  .rows a { grid-template-columns: 1fr auto; }
+  .rows small:last-child { display: none; }
+  .chooser a { min-height: 50svh; }
+  .dock {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 30;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .dock a {
+    text-align: center;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.85rem 0.2rem;
+    min-height: 52px;
+  }
+  .night .stage { min-height: calc(100svh - 8.5rem); padding: 1rem 0 0.5rem; }
+  body.field, body.night { padding-bottom: calc(4.4rem + env(safe-area-inset-bottom)); }
+}
