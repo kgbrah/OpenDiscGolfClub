@@ -25,7 +25,14 @@ img { max-width: 100%; display: block; }
   backdrop-filter: blur(16px);
 }
 .brand { display: flex; align-items: center; gap: 0.55rem; text-decoration: none; min-width: 0; }
-.brand img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.brand img {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  object-position: left center;
+}
 .brand strong {
   font-family: "Bebas Neue", sans-serif;
   font-weight: 400;
@@ -196,7 +203,7 @@ h1 {
     linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 8%, transparent) 20%, var(--bg-primary)),
     url("img/slide2.jpg") center 30% / cover no-repeat;
 }
-.night .copy { width: min(1120px, calc(100% - 2rem)); }
+.night .copy { width: min(1120px, calc(100% - 2rem)); margin-inline: auto; }
 .night h1, .night .lede { color: var(--light); text-shadow: 0 2px 18px color-mix(in srgb, var(--dark) 70%, transparent); }
 .night .rhythm article { border-top-color: var(--accent); }
 .night .rhythm b, .night .rhythm span { color: var(--light); }
@@ -233,13 +240,39 @@ h1 {
 
 @media (max-width: 800px) {
   .links { display: none; }
+  .top {
+    flex-wrap: wrap;
+    gap: 0.45rem 0.7rem;
+    padding: calc(0.45rem + env(safe-area-inset-top)) 0.85rem 0.5rem;
+  }
+  .brand { flex: 1 1 auto; }
+  .brand strong { font-size: 1.2rem; white-space: nowrap; }
+  .switch { width: 100%; }
+  .switch a { min-height: 36px; display: inline-flex; align-items: center; }
   .field .stage, .feature, .ticket, .chooser { grid-template-columns: 1fr; }
-  .field .photo { min-height: 32vh; }
-  .field .copy { padding: 1.4rem 1rem 0.4rem; }
-  .rhythm { display: flex; overflow-x: auto; gap: 0.8rem; padding-bottom: 0.3rem; }
-  .rhythm article { min-width: 11rem; }
+  .field .photo { min-height: 28vh; }
+  .field .copy { padding: 1.1rem 0 0.2rem; }
+  h1 { font-size: clamp(2.5rem, 12vw, 3.1rem); }
+  .lede { font-size: 1rem; }
+  .actions { margin-top: 0.85rem; }
+  .actions .btn { flex: 1 1 8rem; }
+  .rhythm {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-bottom: 0.2rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rhythm article { min-width: 82%; scroll-snap-align: start; }
+  .feature { margin-top: 1rem; }
+  .feature img { min-height: 200px; max-height: 220px; }
+  .rows a { min-height: 52px; align-items: center; }
   .rows a { grid-template-columns: 1fr auto; }
   .rows small:last-child { display: none; }
+  .ticket { padding: 1.15rem; }
+  .ticket .price { font-size: 3.4rem; }
   .chooser a { min-height: 50svh; }
   .dock {
     display: grid;
@@ -262,6 +295,12 @@ h1 {
     padding: 0.85rem 0.2rem;
     min-height: 52px;
   }
-  .night .stage { min-height: calc(100svh - 8.5rem); padding: 1rem 0 0.5rem; }
-  body.field, body.night { padding-bottom: calc(4.4rem + env(safe-area-inset-bottom)); }
+  .night .stage {
+    min-height: calc(100svh - 8.4rem - env(safe-area-inset-top));
+    box-sizing: border-box;
+    align-items: flex-end;
+    padding: 0.4rem 0 calc(4.8rem + env(safe-area-inset-bottom));
+  }
+  .night .copy { width: min(1120px, calc(100% - 1.7rem)); }
+  body.field, body.night { padding-bottom: calc(4.2rem + env(safe-area-inset-bottom)); }
 }
