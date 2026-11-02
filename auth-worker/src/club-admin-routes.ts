@@ -12,6 +12,7 @@ import { handleAdminMembers } from "./club-admin-members.js";
 import { handleAdminExport } from "./club-admin-export.js";
 import { handleAdminShop } from "./club-admin-shop.js";
 import { handleAdminTeeSigns } from "./club-admin-tee-signs.js";
+import { handleAdminVoiceFill } from "./voice-fill-route.js";
 
 export async function handleClubAdmin(
   request: Request,
@@ -40,6 +41,7 @@ export async function handleClubAdmin(
   else if (sub === "members") response = await handleAdminMembers(request, env, origin, method, seg, adminId);
   else if (sub === "shop" || sub === "wallets" || sub === "orders") response = await handleAdminShop(request, env, origin, method, seg, adminId);
   else if (sub === "tee-signs") response = await handleAdminTeeSigns(request, env, origin, method, seg, adminId, id);
+  else if (sub === "voice-fill" && method === "POST") response = await handleAdminVoiceFill(request, env, origin, adminId);
   else if (sub === "export") response = await handleAdminExport(request, env, origin, method, seg, adminId);
 
   return response ?? json({ error: "not_found" }, 404, origin);

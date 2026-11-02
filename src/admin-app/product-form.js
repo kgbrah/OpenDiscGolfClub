@@ -1,5 +1,7 @@
 import React from "react";
 
+import { applyShopVoice, VoiceFill } from "./voice-fill.js";
+
 const h = React.createElement;
 
 const CATEGORY_OPTIONS = [
@@ -166,6 +168,11 @@ export function AdminProductForm() {
     id: "adminProductForm",
     onSubmit: submit,
   }, [
+    h(VoiceFill, {
+      form: "shop",
+      key: "voice",
+      onFields: (fields) => setForm((current) => applyShopVoice(current, fields)),
+    }),
     h("div", { key: "category" }, [
       h("label", { htmlFor: "psCategory", key: "label" }, "Category"),
       h("select", { id: "psCategory", key: "input", onChange: (event) => updateField("category", event.target.value), value: form.category }, optionNodes(CATEGORY_OPTIONS)),

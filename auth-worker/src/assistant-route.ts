@@ -115,6 +115,13 @@ function workersAiProvider(env: Env): ReplyProvider {
   };
 }
 
+export function assistantProviders(env: Env): ReplyProvider[] {
+  const providers: ReplyProvider[] = [];
+  if (env.OPENROUTER_API_KEY) providers.push(openRouterProvider(env));
+  if (env.AI) providers.push(workersAiProvider(env));
+  return providers;
+}
+
 export async function handleAssistant(request: Request, env: Env, origin: string | null): Promise<Response> {
   const body = await readJson(request, ASSISTANT_BODY_BYTES);
   const images = takeRulingImages(body?.images);
@@ -176,9 +183,7 @@ export async function handleAssistant(request: Request, env: Env, origin: string
   });
   const actions = suggestCrottsActions({ message: asked, liveEvents, openEvents });
 
-  const providers: ReplyProvider[] = [];
-  if (env.OPENROUTER_API_KEY) providers.push(openRouterProvider(env));
-  if (env.AI) providers.push(workersAiProvider(env));
+  const providers = assistantProviders(env);
 
   if (!providers.length) {
     return json({

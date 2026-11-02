@@ -1,6 +1,7 @@
 import React from "react";
 
 import { clubWallClockToIso, isoToClubWallClock } from "../shared/events-model.js";
+import { applyEventVoice, VoiceFill } from "./voice-fill.js";
 
 const h = React.createElement;
 
@@ -418,6 +419,11 @@ export function AdminEventForm() {
 
   return h("div", { "data-react-admin-event-form": editingEvent ? "edit" : "create" }, [
     h("p", { className: "admin-form-note", id: "aeModeNote", key: "note" }, note),
+    h(VoiceFill, {
+      form: "event",
+      key: "voice",
+      onFields: (fields) => setForm((current) => applyEventVoice(current, fields, courses)),
+    }),
     h("form", { className: "admin-form", id: "adminCreateForm", key: "form", onSubmit: submit }, [
       formField({ id: "aeType", label: "Type", children: h("select", { id: "aeType", key: "input", onChange: (event) => updateField("type", event.target.value), value: form.type }, [option("tournament", "Tournament"), option("league_round", "League round"), option("fundraiser", "Fundraiser"), option("meeting", "Meeting")]) }),
       formField({ id: "aeName", label: "Name", children: h("input", { id: "aeName", key: "input", maxLength: 200, onChange: (event) => updateField("name", event.target.value), ref: nameInput, required: true, value: form.name }) }),
