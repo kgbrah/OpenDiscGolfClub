@@ -527,6 +527,27 @@
                 .handicap-row b.under { color: var(--under); }
                 .handicap-row b.over { color: var(--team-red); }
                 .handicap-row b.even { color: var(--accent); }
+                .udisc-import-btn { display: inline-flex; align-items: center; justify-content: center; width: auto; margin-top: 0.55rem; cursor: pointer; }
+                .udisc-import-btn input { display: none; }
+                .udisc-history-note { margin-top: 0.45rem; }
+                .udisc-history-picks { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.55rem; }
+                .udisc-history-picks .player-btn { width: auto; margin-top: 0; }
+                .udisc-history-list { display: grid; gap: 0.55rem; margin-top: 0.7rem; }
+                .udisc-history-row {
+                    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+                    padding: 0.65rem 0.75rem; border: 1px solid var(--border-color); border-radius: 12px;
+                    background: var(--bg-primary);
+                }
+                .udisc-history-title { font-weight: 700; line-height: 1.25; }
+                .udisc-history-side { display: grid; justify-items: end; gap: 0.35rem; }
+                .udisc-history-side .player-btn { width: auto; margin-top: 0; min-height: 36px; padding: 0.35rem 0.7rem; }
+                .udisc-history-score {
+                    display: flex; align-items: baseline; gap: 0.35rem;
+                    font-family: 'Bebas Neue', sans-serif; font-size: 1.35rem; letter-spacing: 0.03em; line-height: 1;
+                }
+                .udisc-history-score.under { color: var(--under); }
+                .udisc-history-score.even { color: var(--accent); }
+                .udisc-history-score.over { color: var(--team-red); }
                 .player-row-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.75rem; }
                 .player-stat {
                     background: var(--bg-secondary); border: 1px solid var(--border-color);
@@ -1133,6 +1154,6 @@
 
     <div id="membersReactDialogsApp"></div>
     <div id="crottsReactApp"></div>
-    <script type="module" src="members-app/members-app.js?v=185"></script>
+    <script type="module" src="members-app/members-app.js?v=186"></script>
 </body>
 </html>

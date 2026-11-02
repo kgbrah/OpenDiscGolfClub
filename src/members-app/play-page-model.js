@@ -67,6 +67,23 @@ export function recentPlayRounds(casual, limit = 8) {
   return rows.sort((a, b) => (b.sort || 0) - (a.sort || 0)).slice(0, limit);
 }
 
+const UDISC_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const UDISC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function formatUdiscWhen(playedAt) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(playedAt || ""));
+  if (!match) return "";
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return "";
+  const day = UDISC_WEEKDAYS[date.getDay()] + ", " + UDISC_MONTHS[date.getMonth()] + " " + date.getDate() + ", " + match[1];
+  if (match[4] === "00" && match[5] === "00") return day;
+  const hour = Number(match[4]);
+  const minute = match[5];
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 || 12;
+  return day + " · " + h12 + ":" + minute + " " + suffix;
+}
+
 export function latestHomeRound(results, casual) {
   const events = (Array.isArray(results) ? results : []).slice().sort((left, right) =>
     String(right && right.event_date || "").localeCompare(String(left && left.event_date || "")),

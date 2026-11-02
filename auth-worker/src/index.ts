@@ -30,6 +30,7 @@ export { LiveEventDO } from "./live.js";
 import { runRatingsRecompute } from "./ratings-recompute.js";
 import { isPdgaEventCron, refreshClubPdgaEvents } from "./pdga-events.js";
 import { isUdiscLayoutCron, runUdiscLayoutImportTick } from "./udisc-layout-import.js";
+import { handleUdiscHistory } from "./udisc-history-routes.js";
 
 /**
  * STOPGAP: when no Workers KV namespace is bound (deployed dev/staging while this account's KV data
@@ -60,6 +61,13 @@ export default {
       if (pathname === "/login" && method === "POST") return await handleLogin(request, env, origin);
       if (pathname === "/me" && method === "GET") return await handleMe(request, env, origin);
       if (pathname === "/my-results" && method === "GET") return await handleMyResults(request, env, origin);
+      if (pathname === "/me/udisc-history" && (method === "GET" || method === "POST" || method === "DELETE")) {
+        return await handleUdiscHistory(request, env, origin, method);
+      }
+      const udiscHistoryId = /^\/me\/udisc-history\/(\d+)$/.exec(pathname);
+      if (udiscHistoryId && method === "DELETE") {
+        return await handleUdiscHistory(request, env, origin, method, Number(udiscHistoryId[1]));
+      }
       if (pathname === "/play-stats" && method === "GET") return await handlePlayStats(request, env, origin);
       if (pathname === "/my-ratings" && method === "GET") return await handleMyRatings(request, env, origin);
       if (pathname === "/my-live-rounds" && method === "GET") return await handleMyLiveRounds(request, env, origin);

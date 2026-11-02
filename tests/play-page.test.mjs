@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { latestHomeRound, publicCasualRound, recentPlayRounds, relClass } from "../src/members-app/play-page-model.js";
+import { formatUdiscWhen, latestHomeRound, publicCasualRound, recentPlayRounds, relClass } from "../src/members-app/play-page-model.js";
 
 test("recentPlayRounds keeps the newest unique casual cards", () => {
   const rows = recentPlayRounds([
@@ -65,4 +65,16 @@ test("Play tab mounts a recent-rounds panel that watches finished cards", () => 
   assert.match(html, /\.recent-round-score/);
   assert.match(html, /\.recent-round-score\.even, \.season-result-par\.even \{ color: var\(--accent\)/);
   assert.match(html, /\.recent-round-score\.over, \.season-result-par\.over \{ color: var\(--team-red\)/);
+});
+
+test("Play tab imports UDisc history without feeding the club handicap", () => {
+  const playPage = readFileSync("src/members-app/play-page.js", "utf8");
+  const html = readFileSync("gvdg-members.html", "utf8");
+  assert.equal(formatUdiscWhen("2024-03-15T10:14:00"), "Fri, Mar 15, 2024 · 10:14 AM");
+  assert.equal(formatUdiscWhen("2024-03-15T00:00:00"), "Fri, Mar 15, 2024");
+  assert.match(playPage, /data-react-udisc-history/);
+  assert.match(playPage, /\/me\/udisc-history/);
+  assert.match(playPage, /do not change your club handicap/);
+  assert.match(playPage, /Export to CSV/);
+  assert.match(html, /\.udisc-history-row/);
 });

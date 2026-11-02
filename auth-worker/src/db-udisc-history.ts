@@ -1,0 +1,74 @@
+import type { D1Like } from "./db-types.js";
+import { runBatch } from "./db-results.js";
+import type { UdiscHistoryRound } from "./imports/udisc-history.js";
+
+export interface UdiscHistoryRow {
+  id: number;
+  player_name: string;
+  course_name: string;
+  layout_name: string;
+  played_at: string;
+  total: number | null;
+  to_par: number | null;
+  holes: string;
+}
+
+export async function listUdiscHistory(db: D1Like, memberId: string, limit: number): Promise<UdiscHistoryRow[]> {
+  const rows = (
+    await db
+      .prepare(
+        `SELECT id, player_name, course_name, layout_name, played_at, total, to_par, holes
+           FROM udisc_history
+          WHERE member_id = ?
+          ORDER BY played_at DESC, id DESC
+          LIMIT ?`,
+      )
+      .bind(memberId, limit)
+      .all<UdiscHistoryRow>()
+  ).results;
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function upsertUdiscHistory(db: D1Like, memberId: string, rounds: readonly UdiscHistoryRound[]): Promise<void> {
+  const statements = rounds.map((round) =>
+    db
+      .prepare(
+        `INSERT INTO udisc_history (
+           member_id, round_key, player_name, course_name, layout_name, played_at, total, to_par, holes
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(member_id, round_key) DO UPDATE SET
+           player_name = excluded.player_name,
+           course_name = excluded.course_name,
+           layout_name = excluded.layout_name,
+           played_at = excluded.played_at,
+           total = excluded.total,
+           to_par = excluded.to_par,
+           holes = excluded.holes,
+           imported_at = datetime('now')`,
+      )
+      .bind(
+        memberId,
+        round.roundKey,
+        round.playerName,
+        round.courseName,
+        round.layoutName,
+        round.playedAt,
+        round.total,
+        round.toPar,
+        JSON.stringify(round.holes),
+      ),
+  );
+  for (let i = 0; i < statements.length; i += 40) {
+    await runBatch(db, statements.slice(i, i + 40));
+  }
+}
+
+export async function deleteUdiscHistory(db: D1Like, memberId: string, id: number): Promise<boolean> {
+  const result = await db.prepare("DELETE FROM udisc_history WHERE member_id = ? AND id = ?").bind(memberId, id).run();
+  const changes = result.meta?.changes ?? result.meta?.rows_written;
+  return changes == null ? true : changes > 0;
+}
+
+export async function clearUdiscHistory(db: D1Like, memberId: string): Promise<void> {
+  await db.prepare("DELETE FROM udisc_history WHERE member_id = ?").bind(memberId).run();
+}
