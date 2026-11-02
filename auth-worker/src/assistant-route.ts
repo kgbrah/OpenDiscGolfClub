@@ -13,9 +13,9 @@ const ASSISTANT_BODY_BYTES = 1_400_000;
 const ASSISTANT_TEXT_BYTES = 64_000;
 const ASSISTANT_LIMIT = 20;
 const ASSISTANT_WINDOW = 60;
-const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
-const DEFAULT_OR_MODEL = "openai/gpt-oss-120b:free";
-const DEFAULT_OR_FALLBACK_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+const DEFAULT_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const DEFAULT_OR_MODEL = "openrouter/free";
+const DEFAULT_OR_FALLBACK_MODEL = "google/gemma-4-26b-a4b-it:free";
 
 class OpenRouterStatusError extends Error {
   constructor(readonly status: number) {
@@ -29,8 +29,23 @@ function openRouterModels(env: Env): string[] {
   return primary === fallback ? [primary] : [primary, fallback];
 }
 
-function shouldTryNextOpenRouterModel(error: unknown): error is OpenRouterStatusError {
-  return error instanceof OpenRouterStatusError && (error.status === 404 || error.status === 408 || error.status === 429 || error.status >= 500);
+function shouldTryNextOpenRouterModel(error: unknown): boolean {
+  if (error instanceof OpenRouterStatusError) {
+    return error.status === 401 || error.status === 402 || error.status === 403 || error.status === 404 || error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+  return true;
+}
+
+function messageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((part) => {
+    if (typeof part === "string") return part;
+    if (part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string") {
+      return (part as { text: string }).text;
+    }
+    return "";
+  }).join("");
 }
 
 async function openRouterCompletion(env: Env, model: string, messages: ChatMessage[]): Promise<string> {
@@ -43,11 +58,12 @@ async function openRouterCompletion(env: Env, model: string, messages: ChatMessa
       "X-Title": "GVDG Crotts",
     },
     body: JSON.stringify({ model, messages, max_tokens: 512, reasoning: { exclude: true } }),
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(12000),
   });
   if (!res.ok) throw new OpenRouterStatusError(res.status);
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  return data?.choices?.[0]?.message?.content ?? "";
+  const data = (await res.json()) as { choices?: { message?: { content?: unknown; reasoning?: unknown } }[] };
+  const message = data?.choices?.[0]?.message;
+  return messageText(message?.content) || messageText(message?.reasoning);
 }
 
 function openRouterProvider(env: Env): ReplyProvider {
@@ -61,7 +77,7 @@ function openRouterProvider(env: Env): ReplyProvider {
           if (content.trim()) return content;
         } catch (error) {
           if (!shouldTryNextOpenRouterModel(error)) throw error;
-          lastError = error;
+          lastError = error instanceof Error ? error : new Error("openrouter_failed");
         }
       }
       if (lastError) throw lastError;
@@ -70,12 +86,31 @@ function openRouterProvider(env: Env): ReplyProvider {
   };
 }
 
+function workersText(out: unknown): string {
+  if (typeof out === "string") return out;
+  if (out && typeof out === "object" && typeof (out as { response?: unknown }).response === "string") {
+    return (out as { response: string }).response;
+  }
+  return "";
+}
+
 function workersAiProvider(env: Env): ReplyProvider {
+  const models = [env.ASSISTANT_MODEL, DEFAULT_MODEL].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
   return {
     name: "workers-ai",
     async generate(messages: ChatMessage[]): Promise<string> {
-      const out = await env.AI.run(env.ASSISTANT_MODEL || DEFAULT_MODEL, { messages, max_tokens: 512 });
-      return typeof out.response === "string" ? out.response : "";
+      let lastError: unknown = null;
+      for (const model of models) {
+        try {
+          const out = await env.AI.run(model as Parameters<Env["AI"]["run"]>[0], { messages, max_tokens: 512 });
+          const text = workersText(out);
+          if (text.trim()) return text;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (lastError) throw lastError;
+      return "";
     },
   };
 }

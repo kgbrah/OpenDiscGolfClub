@@ -88,7 +88,7 @@ describe("POST /assistant", () => {
     const j = await jsonObject(res);
     expect(j.reply).toBe("From OpenRouter!");
     expect(j.provider).toBe("openrouter");
-    expect(bodies[0]).toContain('"model":"openai/gpt-oss-120b:free"');
+    expect(bodies[0]).toContain('"model":"openrouter/free"');
   });
 
   it("uses the OpenRouter fallback model when GPT-OSS is rate-limited", async () => {
@@ -104,8 +104,8 @@ describe("POST /assistant", () => {
     const j = await jsonObject(res);
     expect(j.reply).toBe("From OpenRouter fallback");
     expect(j.provider).toBe("openrouter");
-    expect(bodies[0]).toContain('"model":"openai/gpt-oss-120b:free"');
-    expect(bodies[1]).toContain('"model":"nvidia/nemotron-3-super-120b-a12b:free"');
+    expect(bodies[0]).toContain('"model":"openrouter/free"');
+    expect(bodies[1]).toContain('"model":"google/gemma-4-26b-a4b-it:free"');
   });
 
   it("falls back to Workers AI when the free OpenRouter model is unavailable", async () => {

@@ -1,7 +1,7 @@
 // Throw videos filmed by a cardmate. Pure checks only. Bytes live in R2, rows in D1.
 // These clips are round media. Do not read them from handicap or ratings.
 
-export const MAX_CLIP_BYTES = 6_000_000;
+export const MAX_CLIP_BYTES = 80_000_000;
 export const MAX_CLIPS_PER_ROUND = 24;
 export const MAX_HIGHLIGHTS_PER_ROUND = 8;
 

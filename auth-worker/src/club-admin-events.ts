@@ -7,6 +7,7 @@ import { getMember } from "./roster.js";
 import { json, readJson } from "./http.js";
 import { asInt, asIsoTimestamp, asStr, inSet, jsonStringArray, validEventCoursesInput, validEventInput } from "./input.js";
 import { AdminLiveConfigError, adminLiveScoringConfigJson } from "./admin-live-config.js";
+import { isLiveFormatError, normalizeLiveScoringConfig } from "./live-format.js";
 import { inlineLayout } from "./admin-event-layout.js";
 import { defaultCtpPayoutNote } from "./admin-payout-notes.js";
 import { playersMatch } from "./player-identity.js";
@@ -21,6 +22,31 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 const hasField = (body: Record<string, unknown>, field: string): boolean => Object.prototype.hasOwnProperty.call(body, field);
+
+function eventIdOf(row: unknown): number | null {
+  if (!row || typeof row !== "object" || !("id" in row)) return null;
+  const id = (row as { id?: unknown }).id;
+  return typeof id === "number" ? id : null;
+}
+
+function scoringConfigFromBody(body: Record<string, unknown>): { playFormat: "singles" | "doubles"; live: string } | null | "invalid" {
+  const hasPlay = hasField(body, "play_format");
+  const hasLive = hasField(body, "liveScoringConfig") || hasField(body, "live_scoring_config");
+  if (!hasPlay && !hasLive) return null;
+  const rawPlay = body.play_format;
+  if (rawPlay != null && rawPlay !== "" && rawPlay !== "singles" && rawPlay !== "doubles") return "invalid";
+  const playFormat = rawPlay === "doubles" ? "doubles" : "singles";
+  const rawLive = hasField(body, "liveScoringConfig") ? body.liveScoringConfig : body.live_scoring_config;
+  try {
+    const normalized = rawLive == null
+      ? normalizeLiveScoringConfig({ groupFormat: playFormat, scoringStyle: body.format === "matchplay" ? "matchplay" : "stroke", handicap: false })
+      : normalizeLiveScoringConfig(rawLive);
+    return { playFormat, live: JSON.stringify({ ...normalized, groupFormat: playFormat }) };
+  } catch (error) {
+    if (isLiveFormatError(error)) return "invalid";
+    throw error;
+  }
+}
 
 function rosterHasPlayer(
   rows: readonly { member_id?: string | null; name?: string | null }[],
@@ -359,7 +385,11 @@ export async function handleAdminEvents(
       eventInput = withPrimaryLayout(v, layoutId);
     }
     if (eventInput.status === "live") return json(liveViaScoringBody, 400, origin);
+    const scoring = scoringConfigFromBody(b as Record<string, unknown>);
+    if (scoring === "invalid") return json({ error: "invalid_config" }, 400, origin);
     const row = await db.createEvent(env.DB, { ...eventInput, created_by: adminId });
+    const createdId = eventIdOf(row);
+    if (createdId != null && scoring) await db.saveEventScoringConfig(env.DB, createdId, scoring.playFormat, scoring.live);
     return json(layout ? { event: row, layout } : { event: row }, 201, origin);
   }
   if (method === "PATCH" && id != null) {
@@ -429,8 +459,12 @@ export async function handleAdminEvents(
       if (cd === undefined) return json({ error: "invalid_event" }, 400, origin);
       patch.checkin_deadline = cd;
     }
+    const scoring = scoringConfigFromBody(b);
+    if (scoring === "invalid") return json({ error: "invalid_config" }, 400, origin);
     const row = await db.updateEvent(env.DB, id, patch);
-    return row ? json({ event: row }, 200, origin) : json({ error: "not_found" }, 404, origin);
+    if (!row) return json({ error: "not_found" }, 404, origin);
+    if (scoring) await db.saveEventScoringConfig(env.DB, id, scoring.playFormat, scoring.live);
+    return json({ event: row }, 200, origin);
   }
   if (method === "DELETE" && id != null) {
     await db.deleteEvent(env.DB, id);

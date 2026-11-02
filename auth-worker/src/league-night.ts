@@ -18,6 +18,8 @@ export type LeagueNightPlan = {
   readonly weekLabel: string;
   readonly date: string | null;
   readonly format: "singles" | "doubles";
+  readonly scoringStyle: "stroke" | "matchplay";
+  readonly handicap: boolean;
   readonly courseId: number | null;
   readonly layoutId: number | null;
   readonly start: boolean;
@@ -69,6 +71,8 @@ export function parseLeagueNightPlan(body: Record<string, unknown>): LeagueNight
   if (!weekLabel) return { error: "invalid_night", message: "Week label is required (for example Week 7)." };
   const format = body.format === "doubles" ? "doubles" : body.format === "singles" ? "singles" : null;
   if (!format) return { error: "invalid_night", message: "Format must be singles or doubles." };
+  const scoringStyle = body.scoringStyle === "stroke" || body.scoring_style === "stroke" ? "stroke" : "matchplay";
+  const handicap = scoringStyle === "stroke" && (body.handicap === true || body.handicap === "true" || body.handicap === 1);
   const date = asStr(body.date, 40);
   const courseId = body.course_id == null || body.course_id === "" ? null : asInt(body.course_id);
   const layoutId = body.layout_id == null || body.layout_id === "" ? null : asInt(body.layout_id);
@@ -85,7 +89,7 @@ export function parseLeagueNightPlan(body: Record<string, unknown>): LeagueNight
     if ("error" in parsed) return parsed;
     matches = parsed;
   }
-  return { weekLabel, date, format, courseId, layoutId, start, matches };
+  return { weekLabel, date, format, scoringStyle, handicap, courseId, layoutId, start, matches };
 }
 
 export function matchEventName(leagueName: string, plan: LeagueNightPlan, match: LeagueNightMatch): string {
@@ -110,7 +114,8 @@ export async function handleAdminLeagueNight(
   }
 
   const leagueName = String((league as { name?: unknown }).name || "League");
-  const liveConfig = JSON.stringify({ groupFormat: plan.format, scoringStyle: "matchplay" });
+  const live = { groupFormat: plan.format, scoringStyle: plan.scoringStyle, handicap: plan.handicap };
+  const liveConfig = JSON.stringify(live);
   const created: Array<Record<string, unknown>> = [];
 
   for (const match of plan.matches) {
@@ -118,7 +123,7 @@ export async function handleAdminLeagueNight(
       type: "league_round",
       name: matchEventName(leagueName, plan, match),
       status: "scheduled",
-      format: "matchplay",
+      format: plan.scoringStyle,
       date: plan.date,
       course_id: plan.courseId,
       layout_id: plan.layoutId,
@@ -142,7 +147,7 @@ export async function handleAdminLeagueNight(
     let startError: string | null = null;
     if (plan.start) {
       const started = await startLiveEvent(env, origin, eventId, {
-        liveScoringConfig: { groupFormat: plan.format, scoringStyle: "matchplay" },
+        liveScoringConfig: live,
       });
       if (started.status === 200) status = "live";
       else {
@@ -160,7 +165,7 @@ export async function handleAdminLeagueNight(
     });
   }
 
-  return json({ night: { weekLabel: plan.weekLabel, format: plan.format, date: plan.date, events: created } }, 201, origin);
+  return json({ night: { weekLabel: plan.weekLabel, format: plan.format, scoringStyle: plan.scoringStyle, handicap: plan.handicap, date: plan.date, events: created } }, 201, origin);
 }
 
 function parseMatchObjects(raw: unknown[], format: "singles" | "doubles"): LeagueNightMatch[] | LeagueNightPlanError {

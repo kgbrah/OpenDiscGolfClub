@@ -293,6 +293,20 @@ export interface EventConfigPatch {
   notes?: string | null;
 }
 
+export async function saveEventScoringConfig(db: D1Like, eventId: number, playFormat: string | null, liveScoringConfig: string) {
+  return db
+    .prepare(
+      `INSERT INTO event_config (event_id, play_format, live_scoring_config)
+       VALUES (?, ?, ?)
+       ON CONFLICT(event_id) DO UPDATE SET
+         play_format = excluded.play_format,
+         live_scoring_config = excluded.live_scoring_config
+       RETURNING *`,
+    )
+    .bind(eventId, playFormat, liveScoringConfig)
+    .first();
+}
+
 export async function getEventConfig(db: D1Like, eventId: number) {
   return db.prepare("SELECT * FROM event_config WHERE event_id = ?").bind(eventId).first();
 }

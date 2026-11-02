@@ -9,7 +9,11 @@ import { readMemberToken } from "../shared/member-session.js";
 import { readOpenPlayToken } from "./open-play-session.js";
 
 const h = React.createElement;
-const MAX_SECONDS = 12;
+const MAX_SECONDS = 15;
+const MAX_CLIP_BYTES = 80_000_000;
+const NATIVE_UHD_EDGE = 3840;
+const HIGH_RES_WIDTH = 1920;
+const HIGH_RES_HEIGHT = 1080;
 const CLIPS_EVENT = "gvdg:throw-clips";
 const CLIP_POLL_MS = 5000;
 
@@ -172,39 +176,35 @@ export function RoundHighlights(props) {
   ]);
 }
 
-function highestVideoConstraints(capabilities) {
+function captureConstraints(capabilities) {
   const caps = capabilities || {};
-  const width = Number(caps.width && caps.width.max);
-  const height = Number(caps.height && caps.height.max);
+  const capW = Number(caps.width && caps.width.max);
+  const capH = Number(caps.height && caps.height.max);
+  // Phones offer a 3840-wide sensor. Fifteen seconds of that often exceeds the 100 MB
+  // request cap, so the saved picture stops at 1080p.
+  const width = Math.min(Number.isFinite(capW) && capW > 0 ? capW : NATIVE_UHD_EDGE, HIGH_RES_WIDTH);
+  const height = Math.min(Number.isFinite(capH) && capH > 0 ? capH : 2160, HIGH_RES_HEIGHT);
   return {
-    frameRate: { ideal: 30 },
-    width: { ideal: Number.isFinite(width) && width > 0 ? width : 3840 },
-    height: { ideal: Number.isFinite(height) && height > 0 ? height : 2160 },
+    frameRate: { ideal: 30, max: 30 },
+    width: { ideal: width, max: width },
+    height: { ideal: height, max: height },
   };
 }
 
 function throwVideoBitrate(width, height) {
-  const pixels = (Number(width) || 1920) * (Number(height) || 1080);
-  const wanted = Math.round(pixels * 30 * 0.08);
-  // Twelve seconds at this rate, plus audio, stays under the 6MB clip limit.
-  return Math.min(Math.max(wanted, 2_000_000), 3_200_000);
+  const pixels = Math.min((Number(width) || HIGH_RES_WIDTH) * (Number(height) || HIGH_RES_HEIGHT), HIGH_RES_WIDTH * HIGH_RES_HEIGHT);
+  const wanted = Math.round(pixels * 30 * 0.12);
+  return Math.min(Math.max(wanted, 4_000_000), 8_000_000);
 }
 
-async function useHighestCameraMode(stream) {
+async function useSaveableCameraMode(stream) {
   const track = stream.getVideoTracks()[0];
   if (!track || typeof track.getCapabilities !== "function") return track || null;
   const caps = track.getCapabilities() || {};
-  const settings = typeof track.getSettings === "function" ? track.getSettings() : {};
-  const maxW = Number(caps.width && caps.width.max) || 0;
-  const maxH = Number(caps.height && caps.height.max) || 0;
-  const curW = Number(settings.width) || 0;
-  const curH = Number(settings.height) || 0;
-  if (maxW > curW || maxH > curH) {
-    try {
-      await track.applyConstraints(highestVideoConstraints(caps));
-    } catch {
-      /* the open request already asked for the highest mode */
-    }
+  try {
+    await track.applyConstraints(captureConstraints(caps));
+  } catch {
+    /* keep whatever the camera already opened */
   }
   return track;
 }
@@ -300,12 +300,12 @@ function ThrowFilmSheet(props) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: {
-          ...highestVideoConstraints(),
+          ...captureConstraints(),
           facingMode: { ideal: "environment" },
         },
       });
       streamRef.current = stream;
-      const track = await useHighestCameraMode(stream);
+      const track = await useSaveableCameraMode(stream);
       const settings = track && typeof track.getSettings === "function" ? track.getSettings() : {};
       if (liveRef.current) liveRef.current.srcObject = stream;
       chunksRef.current = [];
@@ -371,8 +371,8 @@ function ThrowFilmSheet(props) {
 
   async function save() {
     if (!blob || phase === "saving") return;
-    if (blob.size > 6_000_000) {
-      setError("That clip is too long to save. Record a shorter one.");
+    if (blob.size > MAX_CLIP_BYTES) {
+      setError("That clip is too big to save. Record a shorter one.");
       return;
     }
     setPhase("saving");
@@ -398,9 +398,11 @@ function ThrowFilmSheet(props) {
       if (!response.ok) {
         const reason = data && data.error === "clip_limit"
           ? "This round already has enough clips."
-          : data && data.error === "round_not_live"
-            ? "The round isn't live, so the clip wasn't saved."
-            : "The clip didn't save. Try again.";
+          : data && data.error === "clip_too_large"
+            ? "That clip is too big to save. Record a shorter one."
+            : data && data.error === "round_not_live"
+              ? "The round isn't live, so the clip wasn't saved."
+              : "The clip didn't save. Try again.";
         setError(reason);
         setPhase("review");
         return;

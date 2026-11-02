@@ -5,7 +5,8 @@ const h = React.createElement;
 const EMPTY_FORM = {
   courseId: "",
   date: "",
-  format: "singles",
+  format: "singles-matchplay",
+  handicap: false,
   layoutId: "",
   leagueId: "",
   matchesText: "",
@@ -57,6 +58,28 @@ function formField({ children, id, label }) {
     h("label", { htmlFor: id, key: "label" }, label),
     children,
   ]);
+}
+
+function splitNightFormat(value) {
+  const text = String(value || "");
+  return {
+    group: text.startsWith("doubles") ? "doubles" : "singles",
+    scoring: text.endsWith("stroke") ? "stroke" : "matchplay",
+  };
+}
+
+function nightFormatFromLeague(format) {
+  const text = String(format || "").toLowerCase();
+  if (!text) return null;
+  const doubles = text.includes("double");
+  const stroke = text.includes("stroke");
+  const match = text.includes("match");
+  if (!doubles && !stroke && !match && text !== "singles") return null;
+  const scoring = stroke && !match ? "stroke" : "matchplay";
+  return {
+    format: `${doubles ? "doubles" : "singles"}-${scoring}`,
+    handicap: scoring === "stroke" && (text.includes("hcp") || text.includes("handicap")),
+  };
 }
 
 export function AdminLeagueNightForm() {
@@ -116,6 +139,15 @@ export function AdminLeagueNightForm() {
         next.layoutId = "";
         if (value) dispatchRequest("gvdg:admin-event-form-layouts-load-request", { courseId: value });
       }
+      if (field === "leagueId") {
+        const league = leagues.find((item) => item.id === value);
+        const applied = nightFormatFromLeague(league && league.format);
+        if (applied) {
+          next.format = applied.format;
+          next.handicap = applied.handicap;
+        }
+      }
+      if (field === "format" && String(value).endsWith("matchplay")) next.handicap = false;
       return next;
     });
   }
@@ -126,12 +158,15 @@ export function AdminLeagueNightForm() {
     currentRequest.current = requestId;
     setBusy(true);
     setResult(null);
+    const night = splitNightFormat(form.format);
     dispatchRequest("gvdg:admin-league-night-request", {
       requestId,
       body: {
         weekLabel: form.weekLabel.trim(),
         date: form.date || null,
-        format: form.format,
+        format: night.group,
+        scoringStyle: night.scoring,
+        handicap: night.scoring === "stroke" && form.handicap === true,
         course_id: form.courseId ? Number(form.courseId) : null,
         layout_id: form.layoutId ? Number(form.layoutId) : null,
         start: form.start,
@@ -143,10 +178,12 @@ export function AdminLeagueNightForm() {
     if (!form.leagueId || !form.weekLabel.trim() || !form.matchesText.trim() || (form.start && !form.layoutId)) setBusy(false);
   }
 
+  const night = splitNightFormat(form.format);
   const layoutsState = layoutsByCourse[form.courseId] || EMPTY_LAYOUTS;
-  const placeholder = form.format === "doubles"
+  const placeholder = night.group === "doubles"
     ? "Juan / Jarrett vs Jesus / Castro"
     : "Jackie vs Jesus";
+  const stroke = night.scoring === "stroke";
 
   return h("form", {
     className: "admin-form",
@@ -177,10 +214,22 @@ export function AdminLeagueNightForm() {
       id: "lnFormat",
       label: "Format",
       children: h("select", { id: "lnFormat", key: "input", onChange: (event) => updateField("format", event.target.value), value: form.format }, [
-        h("option", { key: "singles", value: "singles" }, "Singles matchplay"),
-        h("option", { key: "doubles", value: "doubles" }, "Doubles matchplay"),
+        h("option", { key: "singles-stroke", value: "singles-stroke" }, "Singles stroke play"),
+        h("option", { key: "doubles-stroke", value: "doubles-stroke" }, "Doubles stroke play"),
+        h("option", { key: "singles-matchplay", value: "singles-matchplay" }, "Singles matchplay"),
+        h("option", { key: "doubles-matchplay", value: "doubles-matchplay" }, "Doubles matchplay"),
       ]),
     }),
+    h("label", { key: "handicap", style: { display: "flex", gap: "0.5rem", alignItems: "center" } }, [
+      h("input", {
+        checked: stroke && form.handicap === true,
+        disabled: !stroke,
+        key: "box",
+        onChange: (event) => updateField("handicap", event.target.checked),
+        type: "checkbox",
+      }),
+      stroke ? "Handicap enabled" : "Handicap enabled (stroke play only)",
+    ]),
     formField({
       id: "lnCourse",
       label: "Course",
@@ -199,7 +248,7 @@ export function AdminLeagueNightForm() {
     }),
     formField({
       id: "lnMatches",
-      label: "Matches (one Red vs Blue line each)",
+      label: stroke ? "Cards (one Red vs Blue line each)" : "Matches (one Red vs Blue line each)",
       children: h("textarea", { id: "lnMatches", key: "input", onChange: (event) => updateField("matchesText", event.target.value), placeholder, required: true, rows: 8, value: form.matchesText }),
     }),
     h("label", { key: "start", style: { display: "flex", gap: "0.5rem", alignItems: "center" } }, [

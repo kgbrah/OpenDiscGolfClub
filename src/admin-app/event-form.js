@@ -9,6 +9,7 @@ const EMPTY_FORM = {
   courseId: "",
   date: "",
   format: "",
+  handicap: false,
   leagueId: "",
   layoutName: "",
   name: "",
@@ -69,14 +70,45 @@ function toLocalDateTime(raw) {
   return isoToClubWallClock(raw);
 }
 
+function parsedLiveConfig(source) {
+  const raw = source.liveScoringConfig ?? source.live_scoring_config ?? null;
+  if (raw && typeof raw === "object") return raw;
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+      return {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function formatFromEvent(source) {
+  const live = parsedLiveConfig(source);
+  const stored = typeof source.format === "string" ? source.format : "";
+  if (!stored && live.scoringStyle == null && source.play_format == null) return { format: "", handicap: false };
+  const doubles = source.play_format === "doubles" || stored === "doubles" || live.groupFormat === "doubles";
+  const scoring = stored === "stroke" || (stored !== "matchplay" && stored !== "doubles" && live.scoringStyle === "stroke")
+    ? "stroke"
+    : "matchplay";
+  return {
+    format: `${doubles ? "doubles" : "singles"}-${scoring}`,
+    handicap: scoring === "stroke" && live.handicap === true,
+  };
+}
+
 function formFromEvent(event) {
   const source = event && typeof event === "object" ? event : {};
   const primary = courseRowsFromEvent(source)[0];
+  const scoring = formatFromEvent(source);
   return {
     checkinDeadline: toLocalDateTime(source.checkin_deadline),
     courseId: primary?.courseId ?? "",
     date: typeof source.date === "string" ? source.date : "",
-    format: typeof source.format === "string" ? source.format : "",
+    format: scoring.format,
+    handicap: scoring.handicap,
     leagueId: source.league_id == null ? "" : String(source.league_id),
     layoutName: "",
     name: typeof source.name === "string" ? source.name : "",
@@ -132,11 +164,14 @@ function eventPayload(form, courseRows, quickLayout) {
   if (!venueRows[0]?.courseId && selectedRows.length > 0) {
     return { body: {}, message: "Primary course required before adding more courses", valid: false };
   }
+  const chosen = String(form.format || "");
+  const doubles = chosen.startsWith("doubles");
+  const scoring = chosen.endsWith("stroke") ? "stroke" : chosen.endsWith("matchplay") ? "matchplay" : null;
   const body = {
     checkin_deadline: toIso(form.checkinDeadline),
     course_id: primaryRow.courseId ? Number(primaryRow.courseId) : null,
     date: form.date || null,
-    format: form.format === "doubles" ? "matchplay" : form.format || null,
+    format: scoring,
     league_id: form.leagueId ? Number(form.leagueId) : null,
     name: form.name.trim(),
     notes: form.notes.trim() || null,
@@ -145,6 +180,14 @@ function eventPayload(form, courseRows, quickLayout) {
     status: form.status,
     type: form.type,
   };
+  if (scoring) {
+    body.play_format = doubles ? "doubles" : "singles";
+    body.liveScoringConfig = {
+      groupFormat: body.play_format,
+      scoringStyle: scoring,
+      handicap: scoring === "stroke" && form.handicap === true,
+    };
+  }
   if (!body.name) return { body, message: "Name required", valid: false };
   const eventCourses = venueRows
     .filter((row) => row.courseId)
@@ -275,7 +318,11 @@ export function AdminEventForm() {
   }, []);
 
   function updateField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === "format" && !String(value).endsWith("stroke")) next.handicap = false;
+      return next;
+    });
   }
 
   function updateCourseRow(key, patch) {
@@ -384,7 +431,23 @@ export function AdminEventForm() {
         option("final", "Final"),
         option("cancelled", "Cancelled"),
       ]) }),
-      formField({ id: "aeFormat", label: "Scoring style", children: h("select", { id: "aeFormat", key: "input", onChange: (event) => updateField("format", event.target.value), value: form.format === "doubles" ? "matchplay" : form.format }, [option("", "-"), option("stroke", "Stroke"), option("matchplay", "Match play")]) }),
+      formField({ id: "aeFormat", label: "Format", children: h("select", { id: "aeFormat", key: "input", onChange: (event) => updateField("format", event.target.value), value: form.format }, [
+        option("", "-"),
+        option("singles-stroke", "Singles stroke play"),
+        option("doubles-stroke", "Doubles stroke play"),
+        option("singles-matchplay", "Singles matchplay"),
+        option("doubles-matchplay", "Doubles matchplay"),
+      ]) }),
+      h("label", { key: "handicap", style: { display: "flex", gap: "0.5rem", alignItems: "center" } }, [
+        h("input", {
+          checked: String(form.format).endsWith("stroke") && form.handicap === true,
+          disabled: !String(form.format).endsWith("stroke"),
+          key: "box",
+          onChange: (event) => updateField("handicap", event.target.checked),
+          type: "checkbox",
+        }),
+        String(form.format).endsWith("stroke") ? "Handicap enabled" : "Handicap enabled (stroke play only)",
+      ]),
       h("div", { className: "admin-event-courses", key: "event-courses" }, [
         h("h4", { className: "al-h", key: "title" }, "Courses & layouts"),
         courseRows.map(courseRowFields),

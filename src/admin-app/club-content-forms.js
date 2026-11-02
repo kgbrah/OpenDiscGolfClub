@@ -4,6 +4,7 @@ const h = React.createElement;
 
 const EMPTY_LEAGUE_FORM = {
   format: "",
+  handicap: false,
   name: "",
   season: "",
 };
@@ -76,9 +77,11 @@ function useRequestForm(emptyForm, resultEvent) {
 
 function leaguePayload(form) {
   const name = form.name.trim();
+  const format = String(form.format || "");
+  const stroke = format.endsWith("stroke");
   return {
     body: {
-      format: form.format || null,
+      format: format ? (stroke && form.handicap ? `${format}-handicap` : format) : null,
       name,
       season: form.season.trim() || null,
     },
@@ -118,6 +121,12 @@ function meetingPayload(form) {
 
 export function AdminLeagueForm() {
   const { beginRequest, busy, form, updateField } = useRequestForm(EMPTY_LEAGUE_FORM, "gvdg:admin-league-create-result");
+  const stroke = String(form.format || "").endsWith("stroke");
+
+  function updateLeagueField(field, value) {
+    updateField(field, value);
+    if (field === "format" && !String(value).endsWith("stroke")) updateField("handicap", false);
+  }
 
   function submit(event) {
     event.preventDefault();
@@ -133,23 +142,34 @@ export function AdminLeagueForm() {
     formField({
       id: "lgName",
       label: "League name",
-      children: h("input", { id: "lgName", key: "input", maxLength: 120, onChange: (event) => updateField("name", event.target.value), required: true, value: form.name }),
+      children: h("input", { id: "lgName", key: "input", maxLength: 120, onChange: (event) => updateLeagueField("name", event.target.value), required: true, value: form.name }),
     }),
     formField({
       id: "lgSeason",
       label: "Season",
-      children: h("input", { id: "lgSeason", key: "input", maxLength: 40, onChange: (event) => updateField("season", event.target.value), placeholder: "2026", value: form.season }),
+      children: h("input", { id: "lgSeason", key: "input", maxLength: 40, onChange: (event) => updateLeagueField("season", event.target.value), placeholder: "2026", value: form.season }),
     }),
     formField({
       id: "lgFormat",
       label: "Format",
-      children: h("select", { id: "lgFormat", key: "input", onChange: (event) => updateField("format", event.target.value), value: form.format }, [
+      children: h("select", { id: "lgFormat", key: "input", onChange: (event) => updateLeagueField("format", event.target.value), value: form.format }, [
         h("option", { key: "blank", value: "" }, "-"),
-        h("option", { key: "doubles", value: "doubles" }, "Doubles"),
-        h("option", { key: "stroke", value: "stroke" }, "Singles/Stroke"),
-        h("option", { key: "matchplay", value: "matchplay" }, "Matchplay"),
+        h("option", { key: "singles-stroke", value: "singles-stroke" }, "Singles stroke play"),
+        h("option", { key: "doubles-stroke", value: "doubles-stroke" }, "Doubles stroke play"),
+        h("option", { key: "singles-matchplay", value: "singles-matchplay" }, "Singles matchplay"),
+        h("option", { key: "doubles-matchplay", value: "doubles-matchplay" }, "Doubles matchplay"),
       ]),
     }),
+    h("label", { key: "handicap", style: { display: "flex", gap: "0.5rem", alignItems: "center" } }, [
+      h("input", {
+        checked: stroke && form.handicap === true,
+        disabled: !stroke,
+        key: "box",
+        onChange: (event) => updateLeagueField("handicap", event.target.checked),
+        type: "checkbox",
+      }),
+      stroke ? "Handicap enabled" : "Handicap enabled (stroke play only)",
+    ]),
     h("button", { className: "admin-btn", disabled: busy, key: "submit", type: "submit" }, busy ? "Adding..." : "Add league"),
   ]);
 }

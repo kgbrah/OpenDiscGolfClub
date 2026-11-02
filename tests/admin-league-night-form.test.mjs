@@ -16,5 +16,11 @@ test('admin leagues pane mounts a React league-night form', () => {
   assert.match(form, /gvdg:admin-league-night-request/);
   assert.match(controller, /gvdg:admin-league-night-request/);
   assert.match(controller, /adminApi\('\/admin\/leagues\/' \+ leagueId \+ '\/nights'/);
+  assert.match(form, /Singles stroke play/);
+  assert.match(form, /Doubles stroke play/);
+  assert.match(form, /Singles matchplay/);
+  assert.match(form, /Doubles matchplay/);
+  assert.match(form, /Handicap enabled/);
+  assert.match(form, /handicap: night\.scoring === "stroke" && form\.handicap === true/);
   assert.doesNotMatch(form, /innerHTML|insertAdjacentHTML|replaceChildren|document\.createElement|querySelector|classList|textContent\s*=/);
 });

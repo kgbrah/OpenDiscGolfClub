@@ -39,7 +39,7 @@ Club Worker (auth-worker/)  ── builds a Crotts prompt + injects live events/
 1. [ ] Make sure **Workers AI** is enabled on the Cloudflare account (it is by default; the `[ai]` binding
        is already declared in `auth-worker/wrangler.toml`).
 2. [ ] (Recommended) Get a **free OpenRouter API key** → set it as the Worker secret `OPENROUTER_API_KEY`.
-3. [ ] Confirm/optionally change `OPENROUTER_MODEL` in `wrangler.toml` (default: `openai/gpt-oss-120b:free`).
+3. [ ] Confirm/optionally change `OPENROUTER_MODEL` in `wrangler.toml` (default: `openrouter/free`).
 4. [ ] Deploy the Worker through the correct path for your environment.
 5. [ ] Verify (curl + open Help on the live site).
 
@@ -60,18 +60,18 @@ That's it. Steps in detail below.
    ```
 3. (Optional) Choose the model in `auth-worker/wrangler.toml`:
    ```toml
-   OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
+   OPENROUTER_MODEL = "openrouter/free"
    ```
    - Browse free models at **https://openrouter.ai/models** (filter **Free**), or
      `GET https://openrouter.ai/api/v1/models` and pick any id ending in `:free`.
    - **Heads-up:** free models rotate and are **rate-limited upstream**; if your chosen one returns 429,
-     Crotts falls back to Workers AI automatically. `openai/gpt-oss-120b:free` tested well; if it gets
+     Crotts falls back to Workers AI automatically. `openrouter/free` picks a live free model; if it gets
      flaky, try another `:free` model. Adding a few credits to OpenRouter raises free-tier limits.
 
 ### Option B — Workers AI only (no third-party key)
 
 Do nothing extra. The `[ai]` binding is already in `wrangler.toml`; Crotts uses
-`@cf/meta/llama-3.1-8b-instruct` (change via `ASSISTANT_MODEL`). Usage bills to your Workers AI quota.
+`@cf/google/gemma-4-26b-a4b-it` (change via `ASSISTANT_MODEL`). Usage bills to your Workers AI quota.
 
 > With **both** configured (recommended), OpenRouter is tried first and Workers AI is the safety net.
 

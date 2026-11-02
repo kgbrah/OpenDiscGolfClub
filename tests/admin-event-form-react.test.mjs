@@ -53,7 +53,14 @@ test('admin new event form is rendered by React and saved through bridge events'
   assert.match(eventForm, /courseRowsFromEvent/);
   assert.match(eventForm, /Add course\/layout/);
   assert.match(eventForm, /id: "aeFormat"/);
-  assert.match(eventForm, /Scoring style/);
+  assert.match(eventForm, /label: "Format"/);
+  assert.match(eventForm, /Singles stroke play/);
+  assert.match(eventForm, /Doubles stroke play/);
+  assert.match(eventForm, /Singles matchplay/);
+  assert.match(eventForm, /Doubles matchplay/);
+  assert.match(eventForm, /Handicap enabled/);
+  assert.match(eventForm, /play_format/);
+  assert.match(eventForm, /liveScoringConfig/);
   assert.doesNotMatch(eventForm, /option\("doubles", "Doubles"\)/);
   assert.doesNotMatch(eventForm, /option\("live", "Live"\)/);
   assert.match(eventForm, /"Live \(from scoring\)"/);
