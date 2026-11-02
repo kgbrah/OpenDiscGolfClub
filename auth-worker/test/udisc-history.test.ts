@@ -41,6 +41,29 @@ describe("parseUdiscHistory", () => {
     expect(parseUdiscHistory("PlayerName,CourseName,LayoutName,Date,Total,+/-,Hole1\nPar,C,L,2024-03-15 1014,,,3\n")).toEqual({ error: "empty" });
   });
 
+  it("reads the current Scorecards export (StartDate, zone, scratched hole)", () => {
+    const csv = [
+      "PlayerName,CourseName,LayoutName,StartDate,EndDate,Total,+/-,RoundRating,Hole1,Hole2,Hole3",
+      "Par,Pine Hollow,Main,2025-05-10 1000-0400,2025-05-10 1130-0400,10,,,3,3,4",
+      "Alex,Pine Hollow,Main,2025-05-10 1000-0400,2025-05-10 1130-0400,7,+1,880,3,4,6",
+    ].join("\n");
+    const parsed = parseUdiscHistory(csv.split("").join("\u0000"));
+    expect(parsed).toMatchObject({
+      players: ["Alex"],
+      rounds: [{
+        playedAt: "2025-05-10T10:00:00",
+        courseName: "Pine Hollow",
+        layoutName: "Main",
+        total: 7,
+        toPar: 1,
+        holes: [
+          { hole: 1, par: 3, strokes: 3 },
+          { hole: 2, par: 3, strokes: 4 },
+        ],
+      }],
+    });
+  });
+
   it("asks for a player when the file has more than one and none match the profile", () => {
     expect(chooseUdiscPlayer(["Jane Doe", "Bob"], { name: "Sam", udisc: "sam" })).toEqual({ players: ["Jane Doe", "Bob"] });
     expect(chooseUdiscPlayer(["Jane Doe", "Bob"], { name: "Jane Doe", udisc: null })).toEqual({ player: "Jane Doe" });

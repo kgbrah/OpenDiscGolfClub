@@ -52,7 +52,7 @@ export function udiscRoundKey(playerName: string, courseName: string, layoutName
   return fnv1a64([norm(playerName), norm(courseName), norm(layoutName), playedAt].join("\n"));
 }
 
-/** UDisc writes local time, not UTC. `2024-03-15 1014` is 10:14. */
+/** Local wall time. Old exports: `Date` `2024-03-15 1014`. Current Scorecards: `StartDate` `2025-05-10 1000-0400` (offset is the zone, not a UTC shift). */
 export function parseUdiscPlayedAt(value: string): string | null {
   const text = value.trim();
   const date = /^(\d{4})-(\d{2})-(\d{2})(?:[ T]+(.+))?$/.exec(text);
@@ -62,7 +62,7 @@ export function parseUdiscPlayedAt(value: string): string | null {
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   let hour = 0;
   let minute = 0;
-  const clock = (date[4] || "").trim();
+  const clock = (date[4] || "").trim().replace(/\s*[+-]\d{2}:?\d{2}$/, "");
   if (clock) {
     const ampm = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])$/.exec(clock);
     const hm = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(clock);
@@ -134,15 +134,35 @@ function holeColumns(headers: string[]): number[] {
   return [...new Set(holes)].sort((a, b) => a - b);
 }
 
+function rowWhen(row: Record<string, string>): string {
+  return row.startdate || row.date || "";
+}
+
+/** Current exports keep a placeholder stroke on a scratched hole and leave it out of Total. */
+function dropScratchedHole(strokes: Map<number, number>, total: number | null): Map<number, number> {
+  if (total == null) return strokes;
+  let sum = 0;
+  for (const score of strokes.values()) sum += score;
+  const gap = sum - total;
+  if (gap <= 0) return strokes;
+  const matches = [...strokes.entries()].filter(([, score]) => score === gap);
+  if (matches.length !== 1) return strokes;
+  const next = new Map(strokes);
+  next.delete(matches[0]![0]);
+  return next;
+}
+
 export function parseUdiscHistory(csv: string): UdiscHistoryParse {
   if (typeof csv !== "string" || !csv.trim() || csv.length > UDISC_HISTORY_MAX_CSV_CHARS) {
     return { error: "unrecognized_csv" };
   }
-  const parsed = parseCsvRows(csv).map(remap);
+  const text = csv.includes("\u0000") ? csv.replace(/\u0000/g, "") : csv;
+  const parsed = parseCsvRows(text).map(remap);
   if (!parsed.length) return { error: "unrecognized_csv" };
   const headers = Object.keys(parsed[0] || {});
   const holes = holeColumns(headers);
-  if (!headers.includes("playername") || !headers.includes("coursename") || !headers.includes("date") || !holes.length) {
+  const hasWhen = headers.includes("date") || headers.includes("startdate");
+  if (!headers.includes("playername") || !headers.includes("coursename") || !hasWhen || !holes.length) {
     return { error: "unrecognized_csv" };
   }
 
@@ -152,7 +172,7 @@ export function parseUdiscHistory(csv: string): UdiscHistoryParse {
     const playerName = clip(row.playername || "", 80);
     const courseName = clip(row.coursename || "", 120);
     const layoutName = clip(row.layoutname || "", 80);
-    const playedAt = parseUdiscPlayedAt(row.date || "");
+    const playedAt = parseUdiscPlayedAt(rowWhen(row));
     if (!playerName || !courseName || !playedAt) continue;
     const cardKey = [norm(courseName), norm(layoutName), playedAt].join("\n");
     if (norm(playerName) === "par") {
@@ -164,18 +184,20 @@ export function parseUdiscHistory(csv: string): UdiscHistoryParse {
       pars.set(cardKey, parFor);
       continue;
     }
-    const strokes = new Map<number, number>();
+    const rawStrokes = new Map<number, number>();
     for (const hole of holes) {
       const score = parseCount(row["hole" + hole] || "", 40);
-      if (score != null) strokes.set(hole, score);
+      if (score != null) rawStrokes.set(hole, score);
     }
+    const total = parseTotal(row.total || "");
+    const strokes = dropScratchedHole(rawStrokes, total);
     if (!strokes.size) continue;
     playerRows.push({
       playerName,
       courseName,
       layoutName,
       playedAt,
-      total: parseTotal(row.total || ""),
+      total,
       toPar: parseToPar(row["+/-"] || row.topar || ""),
       strokes,
     });
