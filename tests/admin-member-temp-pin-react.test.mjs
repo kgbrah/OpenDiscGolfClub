@@ -13,6 +13,8 @@ test('admin member temporary PIN display is rendered by React from direct create
   assert.match(html, /\.admin-temp-pin \{[^}]*border: 2px solid var\(--primary\)/);
   assert.ok(showTempPin);
   assert.match(showTempPin, /new CustomEvent\('gvdg:admin-member-temp-pin', \{ detail: state \}\)/);
+  assert.match(showTempPin, /adminShowPin\(/);
+  assert.match(html, /adminMembersQuietRefresh = true/);
   assert.doesNotMatch(showTempPin, /publishAdminState\('memberTempPin'/);
   assert.doesNotMatch(showTempPin, /amTempPin|textContent|appendChild|style\.cssText|createElement|elx\(|addEventListener|classList/);
   assert.match(main, /import \{ AdminMembersList, AdminMemberTempPin, AdminMembershipApplications \} from "\.\/members-list\.js"/);

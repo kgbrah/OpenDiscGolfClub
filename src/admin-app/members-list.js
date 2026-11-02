@@ -124,6 +124,7 @@ export function AdminMemberTempPin() {
   const [state, setState] = React.useState(() => normalizeTempPinState(EMPTY_TEMP_PIN_STATE));
   const [copied, setCopied] = React.useState(false);
   const resetTimer = React.useRef(0);
+  const boxRef = React.useRef(null);
 
   React.useEffect(() => {
     function update(event) {
@@ -137,6 +138,9 @@ export function AdminMemberTempPin() {
     setCopied(false);
     if (resetTimer.current) window.clearTimeout(resetTimer.current);
     resetTimer.current = 0;
+    if (state.tempPin && boxRef.current && typeof boxRef.current.scrollIntoView === "function") {
+      boxRef.current.scrollIntoView({ block: "center" });
+    }
   }, [state.tempPin]);
 
   React.useEffect(() => () => {
@@ -159,14 +163,21 @@ export function AdminMemberTempPin() {
     "aria-live": "polite",
     className: "admin-temp-pin",
     "data-react-admin-member-temp-pin": "ready",
+    ref: boxRef,
     role: "status",
   }, [
     h("div", { className: "admin-temp-pin-title", key: "title" }, `Temporary PIN for ${state.member.name} (${memberPinLabel(state.member)})`),
     h("div", { className: "admin-temp-pin-row", key: "pin-row" }, [
       h("span", { className: "admin-temp-pin-code", key: "pin" }, state.tempPin),
       h("button", { className: "admin-btn", key: "copy", onClick: copyPin, type: "button" }, copied ? "Copied" : "Copy"),
+      h("button", {
+        className: "admin-btn secondary",
+        key: "hide",
+        onClick: () => setState(normalizeTempPinState(EMPTY_TEMP_PIN_STATE)),
+        type: "button",
+      }, "Hide"),
     ]),
-    h("div", { className: "admin-temp-pin-note", key: "note" }, `Give this to ${state.member.name}. They log in with their ${loginMethod} and this PIN, then set their own PIN. Shown once.`),
+    h("div", { className: "admin-temp-pin-note", key: "note" }, `Give this to ${state.member.name}. They log in with their ${loginMethod} and this PIN, then set their own PIN. It stays here until you hide it.`),
   ]);
 }
 

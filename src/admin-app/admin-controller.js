@@ -1,4 +1,4 @@
-import { adminConfirm } from "./admin-dialogs.js";
+import { adminConfirm, adminShowPin } from "./admin-dialogs.js";
 import { publishAdminActiveTab, publishAdminAuthGateState, publishAdminMessageState, publishAdminOrdersBadgeCount } from "./admin-shell-state.js";
 import { installCourseLayoutsController } from "./course-layouts-controller.js";
 import { installDataArchiveController } from "./data-archive-controller.js";
@@ -670,16 +670,31 @@ export function startAdminController() {
         function showTempPin(member, tempPin) {
             const state = { member: member || null, tempPin: tempPin || '' };
             window.dispatchEvent(new CustomEvent('gvdg:admin-member-temp-pin', { detail: state }));
+            const pin = String(tempPin || '').trim();
+            if (!pin) return;
+            const name = member && member.name ? member.name : 'this member';
+            adminShowPin({
+                title: 'Temporary PIN for ' + name,
+                pin: pin,
+                message: 'Copy it before you close this. It is shown once, and their old PIN no longer works.',
+            });
         }
+        let adminMembersQuietRefresh = false;
         async function adminLoadMembers() {
-            window.dispatchEvent(new CustomEvent('gvdg:admin-members-list', { detail: { status: 'loading', members: [], currentMemberId: ME_ID } }));
+            const quiet = adminMembersQuietRefresh;
+            adminMembersQuietRefresh = false;
+            if (!quiet) {
+                window.dispatchEvent(new CustomEvent('gvdg:admin-members-list', { detail: { status: 'loading', members: [], currentMemberId: ME_ID } }));
+            }
             let members = [];
             try { const r = await adminApi('/admin/members'); if (r.ok) members = (await r.json()).members || []; } catch (e) {}
             window.dispatchEvent(new CustomEvent('gvdg:admin-members-list', { detail: { status: 'ready', members, currentMemberId: ME_ID } }));
-            await adminLoadMembershipApplications();
+            await adminLoadMembershipApplications(quiet);
         }
-        async function adminLoadMembershipApplications() {
-            window.dispatchEvent(new CustomEvent('gvdg:admin-membership-applications', { detail: { status: 'loading', applications: [] } }));
+        async function adminLoadMembershipApplications(quiet) {
+            if (!quiet) {
+                window.dispatchEvent(new CustomEvent('gvdg:admin-membership-applications', { detail: { status: 'loading', applications: [] } }));
+            }
             let applications = [];
             try { const r = await adminApi('/admin/members/applications'); if (r.ok) applications = (await r.json()).applications || []; } catch (e) {}
             window.dispatchEvent(new CustomEvent('gvdg:admin-membership-applications', { detail: { status: 'ready', applications } }));
@@ -711,6 +726,7 @@ export function startAdminController() {
                 showTempPin(j.member, j.tempPin);
                 adminMsg('Member created', true);
                 window.dispatchEvent(new CustomEvent('gvdg:admin-member-create-result', { detail: { ok: true, requestId } }));
+                adminMembersQuietRefresh = true;
                 adminLoadMembers();
             }
             else {
@@ -1311,6 +1327,7 @@ export function startAdminController() {
                     const j = await r.json();
                     showTempPin(j.member, j.tempPin);
                     adminMsg('New temp PIN issued', true);
+                    adminMembersQuietRefresh = true;
                     adminLoadMembers();
                 } else {
                     adminMsg('Reissue failed (' + r.status + ')', false);

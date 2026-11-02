@@ -20,15 +20,18 @@ function pumpQueue() {
 }
 
 function requestDialog(options) {
+  const opts = options || {};
   return new Promise((resolve) => {
     queue.push({
       id: nextId++,
       resolve,
-      title: options.title || "Confirm action",
-      message: options.message || "",
-      confirmText: options.confirmText || "Confirm",
-      cancelText: options.cancelText || "Cancel",
-      danger: options.danger === true,
+      title: opts.title || "Confirm action",
+      message: opts.message || "",
+      confirmText: opts.confirmText || "Confirm",
+      cancelText: opts.cancelText || "Cancel",
+      danger: opts.danger === true,
+      pin: typeof opts.pin === "string" ? opts.pin : "",
+      acknowledge: opts.acknowledge === true,
     });
     pumpQueue();
   });
@@ -47,15 +50,28 @@ export function adminConfirm(options) {
   return requestDialog(options || {});
 }
 
+export function adminShowPin(options) {
+  const opts = options || {};
+  return requestDialog({
+    title: opts.title || "Temporary PIN",
+    message: opts.message || "Copy this PIN before you close. It is shown once.",
+    confirmText: opts.confirmText || "Done",
+    pin: String(opts.pin || ""),
+    acknowledge: true,
+  });
+}
+
 export function AdminDialogs() {
   const [dialog, setDialog] = React.useState(activeDialog);
+  const [copied, setCopied] = React.useState(false);
   const titleId = dialog ? `adminDialogTitle-${dialog.id}` : "adminDialogTitle";
   const bodyId = dialog ? `adminDialogBody-${dialog.id}` : "adminDialogBody";
   const a11y = useAccessibleDialog({
     open: Boolean(dialog),
-    onClose: () => settle(false),
+    onClose: () => settle(dialog && dialog.acknowledge ? true : false),
     labelledBy: titleId,
     label: dialog?.title || "Confirm action",
+    closeOnBackdrop: !(dialog && dialog.acknowledge),
   });
 
   React.useEffect(() => {
@@ -64,8 +80,23 @@ export function AdminDialogs() {
     return () => subscribers.delete(setDialog);
   }, []);
 
+  React.useEffect(() => {
+    setCopied(false);
+  }, [dialog && dialog.id]);
+
   if (!dialog) return null;
   const confirmClass = `admin-btn admin-dialog-btn${dialog.danger ? " danger-strong" : ""}`;
+
+  async function copyPin() {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText && dialog.pin) {
+        await navigator.clipboard.writeText(dialog.pin);
+      }
+    } catch {
+      /* the PIN stays on screen either way */
+    }
+    setCopied(true);
+  }
 
   return createPortal(
     h("div", {
@@ -83,9 +114,11 @@ export function AdminDialogs() {
       tabIndex: -1,
     }, [
       h("h2", { className: "admin-dialog-title", id: titleId, key: "title" }, dialog.title),
+      dialog.pin ? h("div", { className: "admin-dialog-pin", key: "pin" }, dialog.pin) : null,
       h("p", { className: "admin-dialog-message", id: bodyId, key: "message" }, dialog.message),
       h("div", { className: "admin-dialog-actions", key: "actions" }, [
-        h("button", { className: "admin-btn secondary admin-dialog-btn", key: "cancel", onClick: () => settle(false), type: "button" }, dialog.cancelText),
+        dialog.pin ? h("button", { className: "admin-btn secondary admin-dialog-btn", key: "copy", onClick: () => { void copyPin(); }, type: "button" }, copied ? "Copied" : "Copy PIN") : null,
+        dialog.acknowledge ? null : h("button", { className: "admin-btn secondary admin-dialog-btn", key: "cancel", onClick: () => settle(false), type: "button" }, dialog.cancelText),
         h("button", { className: confirmClass, key: "confirm", onClick: () => settle(true), type: "button" }, dialog.confirmText),
       ]),
     ])),

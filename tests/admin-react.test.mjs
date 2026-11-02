@@ -281,7 +281,8 @@ test('admin confirmations render through a shared React dialog service', () => {
   assert.match(dialogs, /aria-modal/);
   assert.match(dialogs, /subscribers/);
   assert.match(dialogs, /queue/);
-  assert.match(dialogs, /onClose: \(\) => settle\(false\)/);
+  assert.match(dialogs, /onClose: \(\) => settle\(dialog && dialog.acknowledge \? true : false\)/);
+  assert.match(dialogs, /onClick: \(\) => settle\(false\)/);
   assert.match(sources, /adminConfirm\(\{/);
   assert.doesNotMatch(sources, /\b(?:window\.)?confirm\(/);
   assert.doesNotMatch(dialogs, /innerHTML|insertAdjacentHTML|replaceChildren|document\.createElement|querySelector|classList|textContent\s*=|☰|✕|🔒|🌙|☀️/);
