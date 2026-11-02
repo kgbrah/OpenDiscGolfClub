@@ -30,6 +30,10 @@ test("a cardmate can film a throw and star a highlight", () => {
   assert.match(film, /getCapabilities/);
   assert.match(film, /3840/);
   assert.doesNotMatch(film, /ideal: 640/);
+  assert.match(film, /frameOrientation/);
+  assert.match(film, /phoneIsLandscape/);
+  assert.match(film, /webkit-playsinline/);
+  assert.match(film, /video\/mp4/);
   assert.match(watch, /live: props.status !== "final"/);
   assert.doesNotMatch(watch, /highlightsOnly/);
   const sql = readFileSync("auth-worker/migrations/0039_throw_clips.sql", "utf8");

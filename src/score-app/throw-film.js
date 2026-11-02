@@ -109,6 +109,7 @@ function momentLabel(moment) {
 
 export function RoundHighlights(props) {
   const { api, clips } = useThrowClips({ refresh: props.live !== false });
+  const landscape = usePhoneLandscape();
   const [open, setOpen] = React.useState(false);
   const rows = clips.filter((clip) => clip && clip.mediaPath);
   if (!rows.length) return null;
@@ -124,7 +125,7 @@ export function RoundHighlights(props) {
     if (response.ok) window.dispatchEvent(new CustomEvent(CLIPS_EVENT));
   }
   return h("section", {
-    className: "throw-highlights" + (open ? " open" : ""),
+    className: "throw-highlights" + (open ? " open" : "") + (landscape ? " is-landscape" : " is-portrait"),
     "data-react-throw-highlights": open ? "open" : "collapsed",
   }, [
     h("button", {
@@ -153,13 +154,13 @@ export function RoundHighlights(props) {
     ]),
     open ? h("div", { className: "throw-highlights-row", id: "throw-videos-body", key: "row" }, rows.map((clip) =>
       h("figure", { className: "throw-highlight", key: clip.id }, [
-        h("video", {
+        h("video", appleVideoAttrs({
           controls: true,
           key: "video",
-          playsInline: true,
+          onLoadedMetadata: markClipFrame,
           preload: "metadata",
           src: api + clip.mediaPath,
-        }),
+        })),
         h("figcaption", { key: "cap" }, [
           clip.highlight ? momentLabel(clip.moment) + " · " : "",
           clip.playerName,
@@ -176,14 +177,75 @@ export function RoundHighlights(props) {
   ]);
 }
 
-function captureConstraints(capabilities) {
+export function frameOrientation(width, height) {
+  const w = Number(width);
+  const h = Number(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return "landscape";
+  return h > w ? "portrait" : "landscape";
+}
+
+export function phoneIsLandscape(win) {
+  const target = win || (typeof window !== "undefined" ? window : null);
+  if (!target) return true;
+  const type = target.screen && target.screen.orientation && target.screen.orientation.type;
+  if (typeof type === "string" && type) return type.indexOf("landscape") === 0;
+  if (typeof target.matchMedia === "function") {
+    try { return target.matchMedia("(orientation: landscape)").matches; } catch { /* old webviews */ }
+  }
+  return !target.innerHeight || target.innerWidth >= target.innerHeight;
+}
+
+function usePhoneLandscape() {
+  const [landscape, setLandscape] = React.useState(() => phoneIsLandscape());
+  React.useEffect(() => {
+    const apply = () => setLandscape(phoneIsLandscape());
+    apply();
+    const mq = typeof window.matchMedia === "function" ? window.matchMedia("(orientation: landscape)") : null;
+    if (mq && mq.addEventListener) mq.addEventListener("change", apply);
+    window.addEventListener("orientationchange", apply);
+    window.addEventListener("resize", apply);
+    return () => {
+      if (mq && mq.removeEventListener) mq.removeEventListener("change", apply);
+      window.removeEventListener("orientationchange", apply);
+      window.removeEventListener("resize", apply);
+    };
+  }, []);
+  return landscape;
+}
+
+function markClipFrame(event) {
+  const video = event.currentTarget;
+  if (!video) return;
+  const orientation = frameOrientation(video.videoWidth, video.videoHeight);
+  video.dataset.orientation = orientation;
+  if (video.videoWidth && video.videoHeight) video.style.aspectRatio = video.videoWidth + " / " + video.videoHeight;
+}
+
+function appleVideoAttrs(extra) {
+  return {
+    playsInline: true,
+    "webkit-playsinline": "true",
+    ...extra,
+  };
+}
+
+function isAppleMobile() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+function captureConstraints(capabilities, landscape) {
   const caps = capabilities || {};
   const capW = Number(caps.width && caps.width.max);
   const capH = Number(caps.height && caps.height.max);
   // Phones offer a 3840-wide sensor. Fifteen seconds of that often exceeds the 100 MB
-  // request cap, so the saved picture stops at 1080p.
-  const width = Math.min(Number.isFinite(capW) && capW > 0 ? capW : NATIVE_UHD_EDGE, HIGH_RES_WIDTH);
-  const height = Math.min(Number.isFinite(capH) && capH > 0 ? capH : 2160, HIGH_RES_HEIGHT);
+  // request cap, so the saved picture stops at 1080p. Portrait swaps the edges.
+  const longEdge = Math.min(Number.isFinite(capW) && capW > 0 ? capW : NATIVE_UHD_EDGE, HIGH_RES_WIDTH);
+  const shortEdge = Math.min(Number.isFinite(capH) && capH > 0 ? capH : 2160, HIGH_RES_HEIGHT);
+  const width = landscape ? longEdge : Math.min(shortEdge, HIGH_RES_HEIGHT);
+  const height = landscape ? Math.min(shortEdge, HIGH_RES_HEIGHT) : longEdge;
   return {
     frameRate: { ideal: 30, max: 30 },
     width: { ideal: width, max: width },
@@ -197,12 +259,14 @@ function throwVideoBitrate(width, height) {
   return Math.min(Math.max(wanted, 4_000_000), 8_000_000);
 }
 
-async function useSaveableCameraMode(stream) {
+async function useSaveableCameraMode(stream, landscape) {
   const track = stream.getVideoTracks()[0];
   if (!track || typeof track.getCapabilities !== "function") return track || null;
+  // iOS rejects a hard max that is not one of its camera presets and drops the preview.
+  if (isAppleMobile()) return track;
   const caps = track.getCapabilities() || {};
   try {
-    await track.applyConstraints(captureConstraints(caps));
+    await track.applyConstraints(captureConstraints(caps, landscape));
   } catch {
     /* keep whatever the camera already opened */
   }
@@ -211,10 +275,57 @@ async function useSaveableCameraMode(stream) {
 
 function recorderMime() {
   if (typeof MediaRecorder === "undefined") return "";
+  // mp4 plays on iPhone and Android. webm does not play on iPhone.
+  if (MediaRecorder.isTypeSupported("video/mp4")) return "video/mp4";
   if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) return "video/webm;codecs=vp8,opus";
   if (MediaRecorder.isTypeSupported("video/webm")) return "video/webm";
-  if (MediaRecorder.isTypeSupported("video/mp4")) return "video/mp4";
   return "";
+}
+
+function cameraRequest(landscape) {
+  const size = landscape
+    ? { width: HIGH_RES_WIDTH, height: HIGH_RES_HEIGHT }
+    : { width: HIGH_RES_HEIGHT, height: HIGH_RES_WIDTH };
+  return {
+    audio: true,
+    video: {
+      facingMode: { ideal: "environment" },
+      frameRate: { ideal: 30 },
+      width: { ideal: size.width },
+      height: { ideal: size.height },
+    },
+  };
+}
+
+async function openCamera(landscape) {
+  const attempts = [
+    cameraRequest(landscape),
+    { audio: true, video: { facingMode: { ideal: "environment" } } },
+    { audio: false, video: { facingMode: "environment" } },
+  ];
+  let lastError = null;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (error) {
+      lastError = error;
+      if (error && error.name === "NotAllowedError") throw error;
+    }
+  }
+  throw lastError || new Error("camera_unavailable");
+}
+
+function makeRecorder(stream, mime, bitrate) {
+  try {
+    return new MediaRecorder(stream, {
+      mimeType: mime,
+      audioBitsPerSecond: 128000,
+      videoBitsPerSecond: bitrate,
+    });
+  } catch {
+    // iOS throws if videoBitsPerSecond is set. The mime type alone still records.
+    return new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  }
 }
 
 export function ThrowFilm(props) {
@@ -253,6 +364,7 @@ function ThrowFilmSheet(props) {
     label: "Film a throw",
   });
   const rows = props.rows;
+  const landscape = usePhoneLandscape();
   const [playerKey, setPlayerKey] = React.useState(() => {
     const me = rows.find((row) => row.isMe);
     return String((me || rows[0]).key);
@@ -296,24 +408,21 @@ function ThrowFilmSheet(props) {
       setError("This phone can't record video in the browser.");
       return;
     }
+    const landscapeNow = phoneIsLandscape();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: {
-          ...captureConstraints(),
-          facingMode: { ideal: "environment" },
-        },
-      });
+      const stream = await openCamera(landscapeNow);
       streamRef.current = stream;
-      const track = await useSaveableCameraMode(stream);
+      const track = await useSaveableCameraMode(stream, landscapeNow);
       const settings = track && typeof track.getSettings === "function" ? track.getSettings() : {};
-      if (liveRef.current) liveRef.current.srcObject = stream;
+      if (liveRef.current) {
+        liveRef.current.srcObject = stream;
+        const orientation = frameOrientation(settings.width, settings.height);
+        liveRef.current.dataset.orientation = orientation;
+        if (settings.width && settings.height) liveRef.current.style.aspectRatio = settings.width + " / " + settings.height;
+        liveRef.current.play().catch(() => {});
+      }
       chunksRef.current = [];
-      const recorder = new MediaRecorder(stream, {
-        mimeType: mime,
-        audioBitsPerSecond: 128000,
-        videoBitsPerSecond: throwVideoBitrate(settings.width, settings.height),
-      });
+      const recorder = makeRecorder(stream, mime, throwVideoBitrate(settings.width, settings.height));
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size) chunksRef.current.push(event.data);
       };
@@ -326,13 +435,18 @@ function ThrowFilmSheet(props) {
           return;
         }
         const next = new Blob(chunksRef.current, { type: mime.split(";")[0] });
+        if (!next.size) {
+          setError("The recording was empty. Try again.");
+          setPhase("idle");
+          return;
+        }
         if (clipUrl) URL.revokeObjectURL(clipUrl);
         setBlob(next);
         setClipUrl(URL.createObjectURL(next));
         setPhase("review");
       };
       recorderRef.current = recorder;
-      recorder.start();
+      try { recorder.start(1000); } catch { recorder.start(); }
       setSeconds(0);
       setPhase("recording");
       const started = Date.now();
@@ -341,8 +455,9 @@ function ThrowFilmSheet(props) {
         setSeconds(elapsed);
         if (elapsed >= MAX_SECONDS && recorder.state === "recording") recorder.stop();
       }, 250);
-    } catch {
-      setError("Camera permission is needed to film the throw.");
+    } catch (error) {
+      const denied = error && (error.name === "NotAllowedError" || error.name === "PermissionDeniedError");
+      setError(denied ? "Camera permission is needed to film the throw." : "The camera didn't open. Try again.");
     }
   }
 
@@ -430,7 +545,7 @@ function ThrowFilmSheet(props) {
     "aria-label": "Film a throw",
     "aria-labelledby": "throw-film-title",
     "aria-modal": dialog.isolated ? "true" : undefined,
-    className: "sheet throw-film-sheet",
+    className: "sheet throw-film-sheet " + (landscape ? "is-landscape" : "is-portrait"),
     ref: dialog.panelRef,
     role: "dialog",
     tabIndex: -1,
@@ -456,8 +571,8 @@ function ThrowFilmSheet(props) {
       }, rows.map((row) => h("option", { key: row.key, value: String(row.key) }, row.label))),
     ]),
     phase === "review"
-      ? h("video", { autoPlay: true, className: "throw-film-preview", controls: true, key: "play", playsInline: true, ref: playRef, src: clipUrl })
-      : h("video", { autoPlay: true, className: "throw-film-preview", key: "live", muted: true, playsInline: true, ref: liveRef }),
+      ? h("video", appleVideoAttrs({ autoPlay: true, className: "throw-film-preview", controls: true, key: "play", onLoadedMetadata: markClipFrame, ref: playRef, src: clipUrl }))
+      : h("video", appleVideoAttrs({ autoPlay: true, className: "throw-film-preview", key: "live", muted: true, ref: liveRef })),
     phase === "recording" ? h("p", { className: "throw-film-timer", key: "timer" }, "Recording " + seconds + "s / " + MAX_SECONDS + "s") : null,
     error ? h("p", { className: "throw-film-error", key: "error", role: "alert" }, error) : null,
     h("label", { className: "throw-film-star", key: "star" }, [

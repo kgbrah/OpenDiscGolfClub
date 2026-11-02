@@ -610,16 +610,22 @@
         .throw-highlights.open .throw-highlights-toggle svg { color: var(--light); }
         .throw-highlights-row { display: flex; flex-direction: column; gap: 0.55rem; overflow: visible; padding: 0.2rem 0 0.15rem; }
         .throw-highlight { margin: 0; width: 100%; min-width: 0; }
-        .throw-highlight video {
-            display: block; width: 100%; height: auto; max-height: min(62dvh, 22rem);
-            aspect-ratio: 16 / 9; object-fit: contain;
-            border-radius: 10px; background: black;
+        .throw-highlight video,
+        .throw-film-preview {
+            display: block; width: 100%; height: auto; max-height: min(52dvh, 22rem);
+            object-fit: contain; border-radius: 10px; background: black;
         }
+        .throw-highlights.is-landscape video,
+        .throw-film-sheet.is-landscape .throw-film-preview { max-height: min(62dvh, 14rem); }
+        .throw-highlight video[data-orientation="portrait"],
+        .throw-film-preview[data-orientation="portrait"] { max-height: min(68dvh, 28rem); }
+        .throw-highlights.is-landscape video[data-orientation="portrait"],
+        .throw-film-sheet.is-landscape .throw-film-preview[data-orientation="portrait"] { max-height: min(72dvh, 16rem); }
         .throw-highlight figcaption { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem; }
         .throw-highlight-star { border: 0; background: transparent; color: var(--primary); font: 700 0.68rem Archivo, sans-serif; padding: 0.2rem 0; cursor: pointer; }
         .throw-film-sheet { display: flex; flex-direction: column; gap: 0.55rem; }
         .throw-film-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-        .throw-film-preview { width: 100%; max-height: 16rem; border-radius: 12px; background: var(--bg-tertiary); object-fit: cover; }
+        .throw-film-preview { width: 100%; }
         .throw-film-timer { margin: 0; font-weight: 800; color: var(--over); }
         .throw-film-error { margin: 0; color: var(--over); font-weight: 700; }
         .throw-film-star { display: flex; align-items: center; gap: 0.45rem; font-weight: 700; }
@@ -1119,6 +1125,6 @@
     <div id="scoreReactLeaderboardSheetApp"></div>
     <div id="scoreReactManagePlayersSheetApp"></div>
     <div id="scoreReactDialogsApp"></div>
-    <script type="module" src="score-app/score-app.js?v=201"></script>
+    <script type="module" src="score-app/score-app.js?v=202"></script>
 </body>
 </html>

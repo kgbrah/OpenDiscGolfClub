@@ -18,6 +18,30 @@ export interface SniffedVideo {
   ext: "webm" | "mp4";
 }
 
+export function byteRange(
+  header: string | null,
+  size: number,
+): { offset: number; length: number } | null | "invalid" {
+  if (header == null || header.trim() === "") return null;
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(header.trim());
+  if (!match || size <= 0) return "invalid";
+  const startRaw = match[1] ?? "";
+  const endRaw = match[2] ?? "";
+  if (startRaw === "" && endRaw === "") return "invalid";
+  if (startRaw === "") {
+    const suffix = Number(endRaw);
+    if (!Number.isInteger(suffix) || suffix <= 0) return "invalid";
+    const length = Math.min(size, suffix);
+    return { offset: size - length, length };
+  }
+  const offset = Number(startRaw);
+  if (!Number.isInteger(offset) || offset < 0 || offset >= size) return "invalid";
+  const end = endRaw === "" ? size - 1 : Number(endRaw);
+  if (!Number.isInteger(end) || end < offset) return "invalid";
+  const last = Math.min(end, size - 1);
+  return { offset, length: last - offset + 1 };
+}
+
 export function sniffVideo(bytes: Uint8Array): SniffedVideo | null {
   if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
     return { contentType: "video/webm", ext: "webm" };

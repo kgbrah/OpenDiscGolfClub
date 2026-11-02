@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { handleThrowClips } from "../src/throw-clip-routes.js";
-import { cardFromMine, clipTarget, sniffVideo } from "../src/throw-clips.js";
+import { cardFromMine, clipTarget, byteRange, sniffVideo } from "../src/throw-clips.js";
 import type { Env } from "../src/env.js";
 
 const CARD = {
@@ -89,10 +89,22 @@ function photos() {
     async put(key: string, value: Uint8Array, opts?: { httpMetadata?: { contentType?: string } }) {
       objects.set(key, { bytes: value, type: opts?.httpMetadata?.contentType || "" });
     },
-    async get(key: string) {
+    async head(key: string) {
       const found = objects.get(key);
       if (!found) return null;
-      return { body: found.bytes, httpMetadata: { contentType: found.type } };
+      return { size: found.bytes.byteLength, httpMetadata: { contentType: found.type } };
+    },
+    async get(key: string, options?: { range?: { offset?: number; length?: number } }) {
+      const found = objects.get(key);
+      if (!found) return null;
+      const size = found.bytes.byteLength;
+      const range = options && options.range;
+      if (range && typeof range.offset === "number") {
+        const offset = range.offset;
+        const length = range.length == null ? size - offset : range.length;
+        return { body: found.bytes.slice(offset, offset + length), size, range: { offset, length }, httpMetadata: { contentType: found.type } };
+      }
+      return { body: found.bytes, size, httpMetadata: { contentType: found.type } };
     },
     async delete(key: string) {
       objects.delete(key);
@@ -111,6 +123,14 @@ describe("throw clip rules", () => {
     mp4.set([0x66, 0x74, 0x79, 0x70], 4);
     expect(sniffVideo(mp4)?.contentType).toBe("video/mp4");
     expect(sniffVideo(new Uint8Array([0xff, 0xd8, 0xff]))).toBeNull();
+  });
+
+  it("answers the byte range Safari asks for before it will play", () => {
+    expect(byteRange(null, 100)).toBeNull();
+    expect(byteRange("bytes=0-1", 40)).toEqual({ offset: 0, length: 2 });
+    expect(byteRange("bytes=8-", 40)).toEqual({ offset: 8, length: 32 });
+    expect(byteRange("bytes=-4", 40)).toEqual({ offset: 36, length: 4 });
+    expect(byteRange("bytes=40-50", 40)).toBe("invalid");
   });
 
   it("only accepts a player who is on the live card", () => {
@@ -157,5 +177,43 @@ describe("throw clip rules", () => {
     expect(body.clips[0]?.playerName).toBe("Jane Doe");
     expect(body.clips[0]?.mediaPath).toBe("/rounds/ABCD/live/clips/" + saved.id + "/media");
     expect(JSON.stringify(body)).not.toMatch(/m_jane/);
+  });
+
+  it("serves a clip as a byte range so Apple can play it", async () => {
+    const used = env();
+    const savedResponse = await handleThrowClips({
+      request: new Request("https://w/rounds/ABCD/live/clips?hole=7&playerIndex=1&playerName=Jane%20Doe", {
+        method: "POST",
+        body: webm().buffer as ArrayBuffer,
+      }),
+      env: used,
+      origin: "https://gvdgclub.com",
+      method: "POST",
+      scope: "round",
+      scopeKey: "ABCD",
+      tail: [],
+      authMember: "m_jane",
+      card: CARD,
+    });
+    const saved = await savedResponse.json() as { id: number };
+    const media = await handleThrowClips({
+      request: new Request("https://w/rounds/ABCD/live/clips/" + saved.id + "/media", {
+        headers: { Range: "bytes=0-3" },
+      }),
+      env: used,
+      origin: "https://gvdgclub.com",
+      method: "GET",
+      scope: "round",
+      scopeKey: "ABCD",
+      tail: [String(saved.id), "media"],
+      authMember: null,
+      card: null,
+    });
+    expect(media.status).toBe(206);
+    expect(media.headers.get("Accept-Ranges")).toBe("bytes");
+    expect(media.headers.get("Content-Range")).toBe("bytes 0-3/40");
+    expect(media.headers.get("Content-Type")).toBe("video/webm");
+    const bytes = new Uint8Array(await media.arrayBuffer());
+    expect(Array.from(bytes)).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
   });
 });

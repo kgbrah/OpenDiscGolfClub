@@ -3,6 +3,7 @@ import { json } from "./http.js";
 import { asInt, asStr } from "./input.js";
 import { kvRateLimited } from "./kv-rate-limit.js";
 import {
+  byteRange,
   cardFromMine,
   clipMoment,
   clipTarget,
@@ -50,6 +51,46 @@ async function readClip(env: Env, scope: string, scopeKey: string, id: number): 
   ).bind(id, scope, scopeKey).first<ClipRow>();
 }
 
+function mediaHeaders(row: ClipRow, origin: string | null, size: number, span: { offset: number; length: number } | null) {
+  const headers: Record<string, string> = {
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "private, max-age=300",
+    "Content-Type": row.content_type || "video/mp4",
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (span) {
+    const end = span.offset + span.length - 1;
+    headers["Content-Length"] = String(span.length);
+    headers["Content-Range"] = "bytes " + span.offset + "-" + end + "/" + size;
+  } else if (size > 0) {
+    headers["Content-Length"] = String(size);
+  }
+  if (origin) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers.Vary = "Origin";
+  }
+  return headers;
+}
+
+// Safari will not play a clip unless it can ask for a byte range.
+async function clipMediaResponse(request: Request, env: Env, row: ClipRow, origin: string | null) {
+  const bucket = env.PHOTOS;
+  if (!bucket) return json({ error: "storage_unavailable" }, 503, origin);
+  const head = await bucket.head(row.r2_key);
+  if (!head) return json({ error: "not_found" }, 404, origin);
+  const size = Number(head.size || 0);
+  const span = byteRange(request.headers.get("Range"), size);
+  if (span === "invalid") {
+    return new Response(null, {
+      status: 416,
+      headers: { ...mediaHeaders(row, origin, size, null), "Content-Range": "bytes */" + size },
+    });
+  }
+  const obj = await bucket.get(row.r2_key, span ? { range: span } : undefined);
+  if (!obj) return json({ error: "not_found" }, 404, origin);
+  return new Response(obj.body, { status: span ? 206 : 200, headers: mediaHeaders(row, origin, size, span) });
+}
+
 export async function handleThrowClips(opts: {
   request: Request;
   env: Env;
@@ -77,17 +118,7 @@ export async function handleThrowClips(opts: {
   if (method === "GET" && clipId != null && tail[1] === "media") {
     const row = await readClip(env, scope, scopeKey, clipId);
     if (!row) return json({ error: "not_found" }, 404, origin);
-    const obj = await env.PHOTOS.get(row.r2_key);
-    if (!obj) return json({ error: "not_found" }, 404, origin);
-    return new Response(obj.body, {
-      status: 200,
-      headers: {
-        "Content-Type": row.content_type,
-        "Cache-Control": "private, max-age=300",
-        "X-Content-Type-Options": "nosniff",
-        ...(origin ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
-      },
-    });
+    return clipMediaResponse(request, env, row, origin);
   }
 
   if (!authMember) return json({ error: "unauthorized" }, 401, origin);
