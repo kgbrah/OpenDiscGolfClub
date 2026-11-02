@@ -22,7 +22,12 @@ test("a cardmate can film a throw and star a highlight", () => {
   assert.match(film, /suggestedMoment/);
   assert.match(film, /Save to round/);
   assert.match(card, /ThrowFilm/);
-  assert.match(watch, /highlightsOnly: true/);
+  assert.match(card, /canStar: true/);
+  assert.match(film, /aria-expanded/);
+  assert.match(film, /stays with this round/);
+  assert.match(film, /CLIP_POLL_MS/);
+  assert.match(watch, /live: props.status !== "final"/);
+  assert.doesNotMatch(watch, /highlightsOnly/);
   const sql = readFileSync("auth-worker/migrations/0039_throw_clips.sql", "utf8");
   assert.match(sql, /Do not read this table from handicap/);
 });

@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { Video, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Video, X } from "lucide-react";
 
 import { useAccessibleDialog } from "../shared/a11y.js";
 import { resolveApiBase } from "../shared/api-base.js";
@@ -11,6 +11,7 @@ import { readOpenPlayToken } from "./open-play-session.js";
 const h = React.createElement;
 const MAX_SECONDS = 12;
 const CLIPS_EVENT = "gvdg:throw-clips";
+const CLIP_POLL_MS = 5000;
 
 function icon(Icon) {
   return h(Icon, { "aria-hidden": "true", focusable: "false", size: 16, strokeWidth: 2.4 });
@@ -55,30 +56,43 @@ async function readJson(response) {
   try { return await response.json(); } catch { return null; }
 }
 
-export function useThrowClips() {
+export function useThrowClips(options) {
+  const refresh = !options || options.refresh !== false;
   const scope = React.useMemo(() => clipScopeFromLocation(window.location), []);
   const api = React.useMemo(() => resolveApiBase({ datasetKeys: ["apiBase"] }), []);
   const [clips, setClips] = React.useState([]);
 
-  const reload = React.useCallback(() => {
-    if (!scope) return undefined;
-    const controller = new AbortController();
-    const { path } = withGuest(scope.listPath);
-    fetch(api + path, { cache: "no-store", signal: controller.signal })
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => {
-        if (data && Array.isArray(data.clips)) setClips(data.clips);
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [api, scope]);
-
-  React.useEffect(() => reload(), [reload]);
   React.useEffect(() => {
-    const onChange = () => reload();
+    if (!scope) return undefined;
+    let alive = true;
+    const controller = new AbortController();
+    async function load() {
+      if (typeof document !== "undefined" && document.hidden) return;
+      try {
+        const { path } = withGuest(scope.listPath);
+        const response = await fetch(api + path, { cache: "no-store", signal: controller.signal });
+        const data = response.ok ? await response.json() : null;
+        if (alive && data && Array.isArray(data.clips)) setClips(data.clips);
+      } catch {
+        /* keep the last list; a blip shouldn't blank the round */
+      }
+    }
+    void load();
+    const onChange = () => { void load(); };
     window.addEventListener(CLIPS_EVENT, onChange);
-    return () => window.removeEventListener(CLIPS_EVENT, onChange);
-  }, [reload]);
+    const timer = refresh ? window.setInterval(() => { void load(); }, CLIP_POLL_MS) : 0;
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    if (refresh && typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      controller.abort();
+      window.removeEventListener(CLIPS_EVENT, onChange);
+      if (timer) window.clearInterval(timer);
+      if (refresh && typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [api, refresh, scope]);
 
   return { api, clips, scope };
 }
@@ -90,10 +104,12 @@ function momentLabel(moment) {
 }
 
 export function RoundHighlights(props) {
-  const { api, clips } = useThrowClips();
-  const hole = props.hole;
-  const rows = clips.filter((clip) => props.highlightsOnly ? clip.highlight : (clip.highlight || clip.hole === hole));
+  const { api, clips } = useThrowClips({ refresh: props.live !== false });
+  const [open, setOpen] = React.useState(false);
+  const rows = clips.filter((clip) => clip && clip.mediaPath);
   if (!rows.length) return null;
+  const canStar = props.canStar === true;
+  const countLabel = rows.length === 1 ? "1 clip" : rows.length + " clips";
   async function toggle(clip) {
     const { path, token } = withGuest(clip.mediaPath.replace(/\/media$/, "/highlight"));
     const response = await fetch(api + path, {
@@ -103,9 +119,35 @@ export function RoundHighlights(props) {
     });
     if (response.ok) window.dispatchEvent(new CustomEvent(CLIPS_EVENT));
   }
-  return h("div", { className: "throw-highlights", "data-react-throw-highlights": "ready" }, [
-    h("p", { className: "throw-highlights-title", key: "title" }, props.highlightsOnly ? "Round highlights" : "Throw videos"),
-    h("div", { className: "throw-highlights-row", key: "row" }, rows.map((clip) =>
+  return h("section", {
+    className: "throw-highlights" + (open ? " open" : ""),
+    "data-react-throw-highlights": open ? "open" : "collapsed",
+  }, [
+    h("button", {
+      "aria-controls": "throw-videos-body",
+      "aria-expanded": open ? "true" : "false",
+      "aria-label": open ? "Minimize throw videos" : "Expand throw videos",
+      className: "throw-highlights-head",
+      key: "head",
+      type: "button",
+      onClick: () => setOpen((value) => !value),
+    }, [
+      h("span", { className: "throw-highlights-copy", key: "copy" }, [
+        h("span", { className: "throw-highlights-title", key: "title" }, "Throw videos"),
+        h("span", { className: "throw-highlights-meta", key: "meta" }, countLabel + " · stays with this round"),
+      ]),
+      h("span", { className: "throw-highlights-toggle", key: "toggle" }, [
+        h("span", { key: "label" }, open ? "Minimize" : "Expand"),
+        h(open ? ChevronUp : ChevronDown, {
+          "aria-hidden": "true",
+          focusable: "false",
+          key: "chev",
+          size: 14,
+          strokeWidth: 2.4,
+        }),
+      ]),
+    ]),
+    open ? h("div", { className: "throw-highlights-row", id: "throw-videos-body", key: "row" }, rows.map((clip) =>
       h("figure", { className: "throw-highlight", key: clip.id }, [
         h("video", {
           controls: true,
@@ -119,14 +161,14 @@ export function RoundHighlights(props) {
           clip.playerName,
           " · Hole " + clip.hole,
         ]),
-        props.highlightsOnly ? null : h("button", {
+        canStar ? h("button", {
           className: "throw-highlight-star",
           key: "star",
           onClick: () => { void toggle(clip); },
           type: "button",
-        }, clip.highlight ? "Unstar" : "Star highlight"),
+        }, clip.highlight ? "Unstar" : "Star highlight") : null,
       ]),
-    )),
+    )) : null,
   ]);
 }
 

@@ -385,7 +385,7 @@ export function WatchView(props) {
     props.courseName || props.layoutName
       ? h("p", { className: "muted watch-meta", key: "meta" }, [props.courseName, props.layoutName].filter(Boolean).join(" · "))
       : null,
-    h(RoundHighlights, { highlightsOnly: true, key: "highlights" }),
+    h(RoundHighlights, { key: "highlights", live: props.status !== "final" }),
     h(WatchHoles, {
       activeHoleIndex: props.activeHoleIndex,
       focus,
