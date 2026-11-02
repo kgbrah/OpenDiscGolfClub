@@ -282,6 +282,8 @@ function ThrowFilmSheet(props) {
     if (clipUrl) URL.revokeObjectURL(clipUrl);
   }, [clipUrl]);
 
+  const dropRef = React.useRef(false);
+
   function stopStream() {
     if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -316,8 +318,14 @@ function ThrowFilmSheet(props) {
         if (event.data && event.data.size) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
-        const next = new Blob(chunksRef.current, { type: mime.split(";")[0] });
         stopStream();
+        if (dropRef.current) {
+          dropRef.current = false;
+          chunksRef.current = [];
+          props.onClose();
+          return;
+        }
+        const next = new Blob(chunksRef.current, { type: mime.split(";")[0] });
         if (clipUrl) URL.revokeObjectURL(clipUrl);
         setBlob(next);
         setClipUrl(URL.createObjectURL(next));
@@ -336,6 +344,22 @@ function ThrowFilmSheet(props) {
     } catch {
       setError("Camera permission is needed to film the throw.");
     }
+  }
+
+  function discard() {
+    if (phase === "saving") return;
+    dropRef.current = true;
+    window.clearInterval(timerRef.current);
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state === "recording") {
+      recorder.stop();
+      return;
+    }
+    stopStream();
+    if (clipUrl) URL.revokeObjectURL(clipUrl);
+    setBlob(null);
+    setClipUrl("");
+    props.onClose();
   }
 
   function stop() {
@@ -450,9 +474,17 @@ function ThrowFilmSheet(props) {
           ? h("button", { className: "btn primary", disabled: phase === "saving", key: "save", onClick: () => { void save(); }, type: "button" }, phase === "saving" ? "Saving" : "Save to round")
           : h("button", { className: "btn primary", key: "start", onClick: () => { void start(); }, type: "button" }, "Record"),
       phase === "review"
-        ? h("button", { className: "btn", key: "retake", onClick: () => { setPhase("idle"); setBlob(null); }, type: "button" }, "Retake")
+        ? h("button", { className: "btn secondary", key: "retake", onClick: () => { setPhase("idle"); setBlob(null); if (clipUrl) URL.revokeObjectURL(clipUrl); setClipUrl(""); }, type: "button" }, "Retake")
         : null,
     ]),
+    phase === "recording" || phase === "review"
+      ? h("button", {
+        className: "btn danger",
+        key: "discard",
+        onClick: discard,
+        type: "button",
+      }, "Discard")
+      : null,
     h("p", { className: "muted throw-film-note", key: "note" }, "A cardmate films it. The clip stays with this round. Highlights are the ones you star."),
   ])), document.body);
 }

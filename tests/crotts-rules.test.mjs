@@ -21,6 +21,7 @@ test("a cardmate can film a throw and star a highlight", () => {
   assert.match(film, /Round highlight/);
   assert.match(film, /suggestedMoment/);
   assert.match(film, /Save to round/);
+  assert.match(film, /"Discard"/);
   assert.match(card, /ThrowFilm/);
   assert.match(card, /canStar: true/);
   assert.match(film, /aria-expanded/);
