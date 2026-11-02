@@ -17,7 +17,7 @@ import { isLiveFormatError, normalizeLiveScoringConfig, type LiveScoringConfig }
 import { mintOpenPlaySession } from "./open-play.js";
 import { weatherLocationForCourse } from "./weather.js";
 import { buildCasualArchiveSnapshot, shouldUseCasualArchive } from "./casual-archive.js";
-import { overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
+import { liveHolesWithPins, overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // unambiguous (no 0/O/1/I/L)
 function genCode(): string {
@@ -82,7 +82,7 @@ export async function handleCasualRounds(
       if (isLiveFormatError(error)) return json({ error: "invalid_live_scoring_config" }, 400, origin);
       throw error;
     }
-    const holes = await db.layoutHolesWithCrowdMap(env.DB, layoutId);
+    const holes = await liveHolesWithPins(env, layoutId);
     if (!holes.length) return json({ error: "no_layout_holes" }, 400, origin);
     const requested = normalizeRoundCode(b.code ?? b.round_code);
     if (requested && "error" in requested) return json({ error: "invalid_code" }, 400, origin);
@@ -193,7 +193,8 @@ export async function handleCasualRounds(
   }
   if (sub === "live" && method === "GET" && seg[3] === "mine") {
     const r = await stub.fetch("https://do/mine", { headers: hdr });
-    return json(await r.json().catch(() => ({})), r.status, origin);
+    const snapshot = await r.json().catch(() => ({}));
+    return json(await overlayLiveSnapshot(env, snapshot as Record<string, unknown>), r.status, origin);
   }
   if (sub === "live" && method === "POST" && seg[3] === "score") {
     if (await kvRateLimited(env, "live:" + actor.sub, 180, 60)) return json({ error: "rate_limited" }, 429, origin);

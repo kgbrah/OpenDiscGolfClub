@@ -21,6 +21,7 @@ import {
     udiscExportData,
 } from "./score-view-model.js";
 import { layoutHoles, matchCourseByName, rememberLastCourse, sortLayoutsForPick } from "./course-pick.js";
+import { fillMissingHolePins, holesFromPositionLabels, markerHasPin } from "../shared/hole-pins.js";
 import { decorateStandings, handicapScoringEnabled } from "../shared/handicap.js";
 import { resolveApiBase } from "../shared/api-base.js";
 import { clearMemberSession, readMemberToken, writeMemberSession } from "../shared/member-session.js";
@@ -71,6 +72,7 @@ export function startScoreApp(options) {
         let locLastSent = 0;
         let locLastFix = null;
         let locLifecycleBound = false;
+        let catalogPinsFor = null;
         const pending = new Map();            // pendingKey -> in-flight count (refcount: concurrent taps on one cell each stay protected until their own POST returns)
         const QKEY = 'gvdg_score_queue:' + (ROUND_CODE || EVENT_ID);
         const wakeLock = createWakeLock();
@@ -517,6 +519,67 @@ export function startScoreApp(options) {
             const mine = S.myIndex != null ? errs.find((e) => e && Array.isArray(e.playerIndexes) && e.playerIndexes.indexOf(S.myIndex) >= 0) : null;
             return mine || errs.find((e) => e && (e.cardId ?? null) === S.cardId) || null;
         }
+        function rememberHolePins(holes) {
+            if (!S.holePins) S.holePins = {};
+            (Array.isArray(holes) ? holes : []).forEach((hole) => {
+                const n = Number(hole && hole.hole);
+                if (!Number.isInteger(n) || n < 1) return;
+                const prev = S.holePins[n] || { hole: n, tee: null, target: null };
+                const next = { hole: n, tee: prev.tee || null, target: prev.target || null };
+                if (markerHasPin(hole.tee)) next.tee = { label: hole.tee.label || null, lat: Number(hole.tee.lat), lng: Number(hole.tee.lng) };
+                if (markerHasPin(hole.target)) next.target = { label: hole.target.label || null, lat: Number(hole.target.lat), lng: Number(hole.target.lng) };
+                S.holePins[n] = next;
+            });
+        }
+        function holesNeedPins(holes) {
+            return (Array.isArray(holes) ? holes : []).some((hole) => !markerHasPin(hole && hole.tee) || !markerHasPin(hole && hole.target));
+        }
+        function pinSignature(holes) {
+            return (Array.isArray(holes) ? holes : []).map((hole) => {
+                const tee = (hole && hole.tee) || {};
+                const basket = (hole && hole.target) || {};
+                return [hole && hole.hole, tee.lat, tee.lng, basket.lat, basket.lng].join(",");
+            }).join("|");
+        }
+        function noteCourse(source) {
+            if (!source) return;
+            if (source.courseId) S.courseId = source.courseId;
+            if (source.layoutId) S.layoutId = source.layoutId;
+        }
+        function assignHoles(holes, source) {
+            noteCourse(source);
+            const list = Array.isArray(holes) ? holes : [];
+            rememberHolePins(list);
+            S.holes = fillMissingHolePins(list, [Object.values(S.holePins || {})]);
+            if (holesNeedPins(S.holes)) void ensureCatalogPins();
+        }
+        async function ensureCatalogPins() {
+            const courseId = Number(S.courseId);
+            if (!Number.isInteger(courseId) || courseId <= 0) return;
+            if (!holesNeedPins(S.holes)) return;
+            if (catalogPinsFor === courseId) return;
+            catalogPinsFor = courseId;
+            const [layoutRes, posRes] = await Promise.all([
+                api("/courses/" + courseId + "/layouts", { auth: false, guest: false }),
+                api("/courses/" + courseId + "/positions", { auth: false, guest: false }),
+            ]);
+            if (layoutRes.status === 0 && posRes.status === 0) {
+                catalogPinsFor = null;
+                return;
+            }
+            const positions = posRes.ok && posRes.data && Array.isArray(posRes.data.positions) ? posRes.data.positions : [];
+            rememberHolePins(holesFromPositionLabels(positions));
+            const layouts = layoutRes.ok && layoutRes.data && Array.isArray(layoutRes.data.layouts) ? layoutRes.data.layouts : [];
+            const layoutId = Number(S.layoutId);
+            const layout = layouts.find((row) => Number(row && row.id) === layoutId) || null;
+            if (layout) rememberHolePins(layoutHoles(layout));
+            const before = pinSignature(S.holes);
+            S.holes = fillMissingHolePins(S.holes, [Object.values(S.holePins || {})]);
+            if (pinSignature(S.holes) === before) return;
+            if (WATCH) renderWatch();
+            else if (S.holes.length) renderHole();
+            if (S.cardId) persistMineCache();
+        }
         function mergeFromSnap() {
             const snap = S.snap; if (!snap || !Array.isArray(snap.players)) return;
             if (snap.roundConfig) S.roundConfig = snap.roundConfig;
@@ -526,7 +589,7 @@ export function startScoreApp(options) {
                 if (snap.status === 'final') stopLiveLocation();
                 if (snap.rev != null) { if (snap.rev <= S.lastRev) { if (extrasChanged) renderWatch(); return; } S.lastRev = snap.rev; }
                 if (snap.status) S.status = snap.status;
-                if (Array.isArray(snap.holes) && snap.holes.length) S.holes = snap.holes;
+                if (Array.isArray(snap.holes) && snap.holes.length) assignHoles(snap.holes, snap);
                 S.roundConfig = snap.roundConfig || S.roundConfig;
                 if (S.pots) S.pots.ctps = withLiveCtpLeaders(S.pots.ctps, snap.liveCtps);
                 renderWatch();
@@ -537,7 +600,7 @@ export function startScoreApp(options) {
             // Drop a stale/out-of-order snapshot (a newer one from another device was already applied).
             if (snap.rev != null) { if (snap.rev <= S.lastRev) { if (extrasChanged) renderHole(); return; } S.lastRev = snap.rev; }
             if (snap.status) S.status = snap.status; // reflect a finalize (or start) that happened on another device
-            if (Array.isArray(snap.holes) && snap.holes.length) S.holes = snap.holes;
+            if (Array.isArray(snap.holes) && snap.holes.length) assignHoles(snap.holes, snap);
             if (typeof snap.cardLocked === 'boolean') S.cardLocked = snap.cardLocked;
             else if (Array.isArray(snap.lockedCardIds)) S.cardLocked = snap.lockedCardIds.indexOf(String(S.cardId ?? 'c0')) >= 0;
             if (snap.cardAttestation) S.cardAttestation = snap.cardAttestation;
@@ -969,7 +1032,7 @@ export function startScoreApp(options) {
             const offline = Boolean(options && options.offline);
             S.snap = d;
             S.status = d.status || null;
-            S.holes = Array.isArray(d.holes) ? d.holes : [];
+            assignHoles(Array.isArray(d.holes) ? d.holes : [], d);
             S.cardId = d.cardId; S.myIndex = d.playerIndex; S.cardmates = d.cardmates;
             S.cardLocked = d.cardLocked === true || (Array.isArray(d.lockedCardIds) && d.lockedCardIds.indexOf(String(d.cardId ?? 'c0')) >= 0);
             S.cardAttestation = d.cardAttestation || { agreedIndexes: [], neededIndexes: [], complete: false };
@@ -1376,7 +1439,7 @@ export function startScoreApp(options) {
             }
             S.snap = d;
             S.status = d.status || null;
-            S.holes = Array.isArray(d.holes) ? d.holes : [];
+            assignHoles(Array.isArray(d.holes) ? d.holes : [], d);
             S.roundConfig = d.roundConfig || null;
             S.courseName = d.courseName || null;
             S.layoutName = d.layoutName || null;

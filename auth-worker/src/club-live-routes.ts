@@ -12,7 +12,7 @@ import { ctpEligibleForStart, parseCtpAddon, registrationPaidEntry } from "./liv
 import { assignCards, type PlayerState } from "./scoring.js";
 import { weatherLocationForCourse } from "./weather.js";
 import { playersMatch } from "./player-identity.js";
-import { overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
+import { liveHolesWithPins, overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
 
 type RosterPlayer = { memberId: string | null; name: string; division: string | null; startingHole: number | null; team: string | null };
 
@@ -60,7 +60,7 @@ export async function startLiveEvent(
   const stub = env.LIVE.get(env.LIVE.idFromName("event:" + eid));
   const ev = (await db.getEvent(env.DB, eid)) as (Record<string, unknown> & { layout_id?: number | null; players?: Record<string, unknown>[] }) | null;
   if (!ev) return json({ error: "not_found" }, 404, origin);
-  const holes = await db.layoutHolesWithCrowdMap(env.DB, ev.layout_id);
+  const holes = await liveHolesWithPins(env, ev.layout_id);
   if (!holes.length) return json({ error: "no_layout_holes" }, 400, origin);
   const evLayout = ev.layout_id != null ? ((await db.getLayout(env.DB, ev.layout_id)) as { name?: string | null; course_id?: number | null } | null) : null;
   const evCourse = evLayout?.course_id != null ? ((await db.getCourse(env.DB, evLayout.course_id)) as { name?: string | null; lat?: number | null; lng?: number | null } | null) : null;
@@ -171,7 +171,8 @@ export async function handleClubLive(
     const id = await scoreIdentity(request, env, null);
     if (!id.authMember) return json({ error: "unauthorized" }, 401, origin);
     const r = await stub.fetch("https://do/mine", { headers: { "X-Auth-Member": id.authMember } });
-    return json(await r.json().catch(() => ({})), r.status, origin);
+    const snapshot = await r.json().catch(() => ({}));
+    return json(await overlayLiveSnapshot(env, snapshot as Record<string, unknown>), r.status, origin);
   }
 
   // Score submission: any player (or guest) may score; the DO enforces that the target is on THEIR card.

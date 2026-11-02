@@ -358,7 +358,10 @@ function HoleHeader(props) {
 }
 
 function holeHasMap(hole) {
-  return Boolean(hole && hole.tee && hole.target);
+  const tee = hole && hole.tee;
+  const basket = hole && hole.target;
+  return Number.isFinite(Number(tee && tee.lat)) && Number.isFinite(Number(tee && tee.lng))
+    && Number.isFinite(Number(basket && basket.lat)) && Number.isFinite(Number(basket && basket.lng));
 }
 
 function useDeviceFix() {

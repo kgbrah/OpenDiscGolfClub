@@ -10,6 +10,8 @@ import {
   parseMapMarkBody,
 } from "./course-map-marks.js";
 import { kvRateLimited } from "./kv-rate-limit.js";
+import { fillMissingHolePins, holesFromPositionLabels, markerHasPin } from "./hole-pins.js";
+import type { ScorableHole } from "./db-courses.js";
 
 const MAP_MARK_LIMIT = 40;
 const MAP_MARK_WINDOW_SEC = 3600;
@@ -30,11 +32,49 @@ type LiveSnapshot = {
 };
 
 export async function overlayLiveSnapshot(env: Env, snapshot: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const layoutId = Number(snapshot.layoutId);
-  if (!Number.isInteger(layoutId) || layoutId <= 0) return snapshot;
-  const consensus = await db.listPublishedConsensus(env.DB, layoutId);
-  if (!consensus.length || !Array.isArray(snapshot.holes)) return snapshot;
-  return { ...snapshot, holes: applyMapConsensus(snapshot.holes as LiveHole[], consensus) };
+  const holes = snapshot.holes;
+  if (!Array.isArray(holes)) return snapshot;
+  let layoutId = Number(snapshot.layoutId);
+  let courseId = Number(snapshot.courseId);
+  const layoutOk = Number.isInteger(layoutId) && layoutId > 0;
+  const courseOk = Number.isInteger(courseId) && courseId > 0;
+  if (!layoutOk && !courseOk) return snapshot;
+
+  const needsPins = holes.some((hole) => {
+    const row = hole as LiveHole;
+    return !markerHasPin(row?.tee) || !markerHasPin(row?.target);
+  });
+  let next = holes as LiveHole[];
+  const consensus = layoutOk ? await db.listPublishedConsensus(env.DB, layoutId) : [];
+  if (needsPins) {
+    let layoutHoles: LiveHole[] = [];
+    if (layoutOk) {
+      layoutHoles = await db.getLayoutHoles(env.DB, layoutId);
+      if (consensus.length) layoutHoles = applyMapConsensus(layoutHoles, consensus);
+    }
+    if (!courseOk && layoutOk) {
+      const layout = (await db.getLayout(env.DB, layoutId)) as { course_id?: number | null } | null;
+      courseId = Number(layout?.course_id);
+    }
+    const positions = Number.isInteger(courseId) && courseId > 0 ? await db.listPositions(env.DB, courseId) : [];
+    next = fillMissingHolePins(next, [holesFromPositionLabels(positions), layoutHoles]);
+  }
+  if (consensus.length) next = applyMapConsensus(next, consensus);
+  if (next === holes) return snapshot;
+  return { ...snapshot, holes: next };
+}
+
+/** Layout holes for a new live round, with blank tees/baskets filled from "Hole N tee/basket" positions. */
+export async function liveHolesWithPins(env: Env, layoutId: number | null | undefined): Promise<ScorableHole[]> {
+  const holes = await db.layoutHolesWithCrowdMap(env.DB, layoutId);
+  if (!holes.some((hole) => !markerHasPin(hole.tee) || !markerHasPin(hole.target))) return holes;
+  const id = Number(layoutId);
+  if (!Number.isInteger(id) || id <= 0) return holes;
+  const layout = (await db.getLayout(env.DB, id)) as { course_id?: number | null } | null;
+  const courseId = Number(layout?.course_id);
+  if (!Number.isInteger(courseId) || courseId <= 0) return holes;
+  const positions = await db.listPositions(env.DB, courseId);
+  return fillMissingHolePins(holes, [holesFromPositionLabels(positions)]);
 }
 
 export async function submitLiveMapMark(options: {
