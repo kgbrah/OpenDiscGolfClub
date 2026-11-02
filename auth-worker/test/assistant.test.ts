@@ -43,6 +43,15 @@ describe("buildMessages (Crotts assistant prompt assembly)", () => {
     expect(sys.indexOf("founding members")).toBeLessThan(sys.indexOf("Current club context"));
   });
 
+  it("puts rules-helper notes after the live club context", () => {
+    const sys = buildMessages({
+      userMessage: "Is this OB?",
+      rulesContext: "Rules helper notes\nA disc at rest past a painted line is out.",
+    })[0]!.content;
+    expect(sys.indexOf("Current club context")).toBeLessThan(sys.indexOf("Rules helper notes"));
+    expect(sys).toMatch(/painted line/);
+  });
+
   it("appends prior history (sanitized) before the new user message", () => {
     const msgs = buildMessages({
       userMessage: "and the one after?",

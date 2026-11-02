@@ -1,0 +1,161 @@
+import { describe, expect, it } from "vitest";
+import { handleThrowClips } from "../src/throw-clip-routes.js";
+import { cardFromMine, clipTarget, sniffVideo } from "../src/throw-clips.js";
+import type { Env } from "../src/env.js";
+
+const CARD = {
+  status: "live",
+  holes: [{ hole: 7 }],
+  cardmates: [{ index: 1, name: "Jane Doe" }],
+};
+
+function webm(): Uint8Array {
+  const bytes = new Uint8Array(40);
+  bytes.set([0x1a, 0x45, 0xdf, 0xa3]);
+  return bytes;
+}
+
+function memoryDb() {
+  const rows: Record<string, unknown>[] = [];
+  let nextId = 1;
+  return {
+    rows,
+    prepare(sql: string) {
+      const text = sql.replace(/\s+/g, " ").trim();
+      const stmt = {
+        binds: [] as unknown[],
+        bind(...values: unknown[]) {
+          stmt.binds = values;
+          return stmt;
+        },
+        async all() {
+          if (text.startsWith("SELECT id, hole")) {
+            const [scope, scopeKey] = stmt.binds;
+            return { results: rows.filter((row) => row.scope === scope && row.scope_key === scopeKey), success: true };
+          }
+          return { results: [], success: true };
+        },
+        async first() {
+          if (text.startsWith("SELECT COUNT")) {
+            const [scope, scopeKey] = stmt.binds;
+            const onlyStars = text.includes("highlight = 1");
+            const matched = rows.filter((row) => row.scope === scope && row.scope_key === scopeKey && (!onlyStars || row.highlight === 1));
+            return { n: matched.length };
+          }
+          if (text.startsWith("SELECT id, hole")) {
+            const [id, scope, scopeKey] = stmt.binds;
+            return rows.find((row) => row.id === id && row.scope === scope && row.scope_key === scopeKey) ?? null;
+          }
+          return null;
+        },
+        async run() {
+          if (text.startsWith("INSERT")) {
+            const [scope, scopeKey, hole, playerName, playerIndex, filmedBy, r2Key, contentType, bytes, highlight, moment] = stmt.binds;
+            const id = nextId++;
+            rows.push({
+              id, scope, scope_key: scopeKey, hole, player_name: playerName, player_index: playerIndex,
+              filmed_by: filmedBy, r2_key: r2Key, content_type: contentType, bytes, highlight, moment,
+              created_at: "2026-11-02",
+            });
+            return { success: true, results: [], meta: { last_row_id: id } };
+          }
+          if (text.startsWith("UPDATE")) {
+            const [highlight, moment, id, scope, scopeKey] = stmt.binds;
+            const row = rows.find((item) => item.id === id && item.scope === scope && item.scope_key === scopeKey);
+            if (row) {
+              row.highlight = highlight;
+              row.moment = moment;
+            }
+            return { success: true, results: [] };
+          }
+          if (text.startsWith("DELETE")) {
+            const [id, scope, scopeKey] = stmt.binds;
+            const index = rows.findIndex((item) => item.id === id && item.scope === scope && item.scope_key === scopeKey);
+            if (index >= 0) rows.splice(index, 1);
+            return { success: true, results: [] };
+          }
+          return { success: true, results: [] };
+        },
+      };
+      return stmt;
+    },
+  };
+}
+
+function photos() {
+  const objects = new Map<string, { bytes: Uint8Array; type: string }>();
+  return {
+    objects,
+    async put(key: string, value: Uint8Array, opts?: { httpMetadata?: { contentType?: string } }) {
+      objects.set(key, { bytes: value, type: opts?.httpMetadata?.contentType || "" });
+    },
+    async get(key: string) {
+      const found = objects.get(key);
+      if (!found) return null;
+      return { body: found.bytes, httpMetadata: { contentType: found.type } };
+    },
+    async delete(key: string) {
+      objects.delete(key);
+    },
+  };
+}
+
+function env() {
+  return { DB: memoryDb(), PHOTOS: photos(), RATELIMIT: { get: async () => null, put: async () => {}, delete: async () => {} } } as unknown as Env;
+}
+
+describe("throw clip rules", () => {
+  it("sniffs webm and mp4 and rejects a jpeg", () => {
+    expect(sniffVideo(webm())?.ext).toBe("webm");
+    const mp4 = new Uint8Array(12);
+    mp4.set([0x66, 0x74, 0x79, 0x70], 4);
+    expect(sniffVideo(mp4)?.contentType).toBe("video/mp4");
+    expect(sniffVideo(new Uint8Array([0xff, 0xd8, 0xff]))).toBeNull();
+  });
+
+  it("only accepts a player who is on the live card", () => {
+    expect(clipTarget(CARD, 7, 1, "Jane Doe")).toEqual({ ok: true, name: "Jane Doe" });
+    expect(clipTarget(CARD, 7, 1, "Jane Doe (you)").ok).toBe(false);
+    expect(clipTarget(CARD, 3, 1, "").ok).toBe(false);
+    expect(clipTarget({ ...CARD, status: "final" }, 7, 1, "").ok).toBe(true);
+    expect(cardFromMine(200, { status: "live", holes: [{ hole: 7 }], cardmates: [{ index: 1, name: "Jane Doe" }] })?.cardmates[0]?.name).toBe("Jane Doe");
+  });
+
+  it("stores a clip and lists it back without the filmer id", async () => {
+    const used = env();
+    const response = await handleThrowClips({
+      request: new Request("https://w/rounds/ABCD/live/clips?hole=7&playerIndex=1&playerName=Jane%20Doe&highlight=1&moment=ace", {
+        method: "POST",
+        body: webm().buffer as ArrayBuffer,
+      }),
+      env: used,
+      origin: "https://gvdgclub.com",
+      method: "POST",
+      scope: "round",
+      scopeKey: "ABCD",
+      tail: [],
+      authMember: "m_jane",
+      card: CARD,
+    });
+    expect(response.status).toBe(201);
+    const saved = await response.json() as { id: number; highlight: boolean; moment: string };
+    expect(saved.highlight).toBe(true);
+    expect(saved.moment).toBe("ace");
+
+    const list = await handleThrowClips({
+      request: new Request("https://w/rounds/ABCD/live/clips"),
+      env: used,
+      origin: null,
+      method: "GET",
+      scope: "round",
+      scopeKey: "ABCD",
+      tail: [],
+      authMember: null,
+      card: null,
+    });
+    const body = await list.json() as { clips: { playerName: string; mediaPath: string; filmed_by?: string }[] };
+    expect(body.clips[0]?.playerName).toBe("Jane Doe");
+    expect(body.clips[0]?.mediaPath).toBe("/rounds/ABCD/live/clips/" + saved.id + "/media");
+    expect(JSON.stringify(body)).not.toMatch(/m_jane/);
+  });
+});

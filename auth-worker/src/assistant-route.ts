@@ -5,8 +5,12 @@ import { buildMessages, generateReply, MAX_HISTORY, type ChatMessage, type ChatT
 import { getClubCalendar, upcoming, type ClubFeeds, type FeedItem } from "./feeds.js";
 import { clientIp, json, readJson } from "./http.js";
 import { kvRateLimited } from "./kv-rate-limit.js";
+import { takeRulingImages } from "./photos.js";
+import { formatPhotoContext, formatRulesContext, rulesForQuestion } from "./rules-lookup.js";
+import { describeRulingImage } from "./vision.js";
 
-const ASSISTANT_BODY_BYTES = 64_000;
+const ASSISTANT_BODY_BYTES = 1_400_000;
+const ASSISTANT_TEXT_BYTES = 64_000;
 const ASSISTANT_LIMIT = 20;
 const ASSISTANT_WINDOW = 60;
 const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
@@ -78,9 +82,16 @@ function workersAiProvider(env: Env): ReplyProvider {
 
 export async function handleAssistant(request: Request, env: Env, origin: string | null): Promise<Response> {
   const body = await readJson(request, ASSISTANT_BODY_BYTES);
+  const images = takeRulingImages(body?.images);
+  if (images == null) return json({ error: "invalid_image" }, 400, origin);
+  if (!images.length && JSON.stringify(body ?? {}).length > ASSISTANT_TEXT_BYTES) {
+    return json({ error: "request_too_large" }, 413, origin);
+  }
   const message = typeof body?.message === "string" ? body.message.trim() : "";
-  if (!message) return json({ error: "invalid_request" }, 400, origin);
-  if (message.length > 2000) return json({ error: "message_too_long" }, 413, origin);
+  const asked = message || (images.length ? "What's the ruling on this lie?" : "");
+  if (!asked) return json({ error: "invalid_request" }, 400, origin);
+  if (asked.length > 2000) return json({ error: "message_too_long" }, 413, origin);
+  const mediaKind = body?.mediaKind === "video" ? "video" : images.length ? "photo" : "";
 
   // Prefer the ATOMIC rate-limit binding on this unauthenticated endpoint — the KV counter is a
   // non-atomic GET-then-PUT, so a concurrent burst can all read a stale count and slip past the cap to
@@ -108,15 +119,27 @@ export async function handleAssistant(request: Request, env: Env, origin: string
   try { openEvents = (await db.listOpenRegistrationEvents(env.DB)) as { id?: number | string | null; name?: string | null }[]; } catch { /* empty */ }
 
   const toCtx = (f: FeedItem) => ({ name: f.name, date: f.date, status: null as string | null });
+  const seen: string[] = [];
+  if (images.length) {
+    const notes = await Promise.all(images.map(async (image) => {
+      try { return await describeRulingImage(env, image.bytes, image.contentType); } catch { return ""; }
+    }));
+    notes.forEach((note) => { if (note.trim()) seen.push(note.trim()); });
+  }
+  const rulesContext = [
+    formatRulesContext(rulesForQuestion(asked + " " + seen.join(" "), images.length > 0)),
+    images.length ? formatPhotoContext(seen, mediaKind) : "",
+  ].filter(Boolean).join("\n\n");
   const messages = buildMessages({
-    userMessage: message,
+    userMessage: asked,
     history,
     events: upcoming(cal.events, now, 8).map(toCtx),
     clubEvents: upcoming(cal.clubEvents, now, 8).map(toCtx),
     courses: courses.map((c) => ({ name: String(c.name ?? ""), location: (c.location as string) ?? null })),
     liveEvents: liveEvents.map((event) => ({ name: String(event.name ?? "Live round"), status: "live" })),
+    rulesContext,
   });
-  const actions = suggestCrottsActions({ message, liveEvents, openEvents });
+  const actions = suggestCrottsActions({ message: asked, liveEvents, openEvents });
 
   const providers: ReplyProvider[] = [];
   if (env.OPENROUTER_API_KEY) providers.push(openRouterProvider(env));

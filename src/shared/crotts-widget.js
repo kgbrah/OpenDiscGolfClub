@@ -1,15 +1,16 @@
 import React from "react";
-import { Send, X } from "lucide-react";
+import { ImagePlus, Send, X } from "lucide-react";
 
 import { resolveApiBase } from "./api-base.js";
 import { sanitizeCrottsActions } from "./crotts-actions.js";
+import { photoDataUrl, videoFrames } from "./ruling-media.js";
 
 const h = React.createElement;
 const AVATAR = "img/crotts.jpg";
 export const CROTTS_HELP_EVENT = "gvdg:help-request";
 
 const CROTTS_CSS = `
-#crotts-panel{position:fixed;left:18px;bottom:18px;width:340px;max-width:calc(100vw - 36px);height:460px;max-height:calc(100vh - 120px);background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:12px;box-shadow:0 20px 60px var(--card-shadow-hover);z-index:9999;display:flex;flex-direction:column;overflow:hidden;font-family:inherit}
+#crotts-panel{position:fixed;left:18px;bottom:18px;width:340px;max-width:calc(100vw - 36px);height:520px;max-height:calc(100vh - 120px);background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:12px;box-shadow:0 20px 60px var(--card-shadow-hover);z-index:9999;display:flex;flex-direction:column;overflow:hidden;font-family:inherit}
 #crotts-head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--secondary);color:white}
 #crotts-head img{width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:center 28%;border:2px solid color-mix(in srgb, white 60%, transparent)}
 #crotts-head .t{font-weight:700;line-height:1.1}
@@ -29,6 +30,12 @@ const CROTTS_CSS = `
 .crotts-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .crotts-action{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 10px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font:inherit;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer}
 .crotts-action:hover{border-color:var(--secondary);color:var(--secondary)}
+#crotts-attach{display:inline-flex;align-items:center;justify-content:center;width:40px;flex:0 0 auto;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer}
+#crotts-attach:disabled{opacity:.5;cursor:default}
+#crotts-file{display:none}
+.crotts-shot{display:flex;gap:8px;align-items:center;padding:0 10px 8px;background:var(--bg-primary);color:var(--text-muted);font-size:12px}
+.crotts-shot img{width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid var(--border-color)}
+.crotts-shot button{margin-left:auto;border:0;background:transparent;color:var(--text-primary);font:inherit;font-weight:700;cursor:pointer}
 @media (max-width:768px){#crotts-panel{left:12px;right:12px;width:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 96px)}}
 @media (max-width:768px){body.admin-page #crotts-panel,body[data-member-shell="members"] #crotts-panel{bottom:calc(4.75rem + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 10.5rem);z-index:10040}}
 `;
@@ -100,9 +107,11 @@ export function CrottsWidget() {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [draft, setDraft] = React.useState("");
+  const [shot, setShot] = React.useState(null);
   const [messages, setMessages] = React.useState([]);
   const historyRef = React.useRef([]);
   const inputRef = React.useRef(null);
+  const fileRef = React.useRef(null);
   const messagesRef = React.useRef(null);
   const idCounter = React.useRef(0);
   const api = React.useMemo(apiBase, []);
@@ -128,7 +137,7 @@ export function CrottsWidget() {
     setMessages((current) => {
       if (current.length) return current;
       return [{
-        content: "Hey, I'm Crotts. Ask me about GVDG events, courses, or how to use the site. I can also open the page you need.",
+        content: "Hey, I'm Crotts. Ask me about GVDG events, courses, how to use the site, or a rules question. Attach a photo or a short video of the lie and I'll read it. I can also open the page you need.",
         id: messageId(idCounter),
         kind: "them",
       }];
@@ -146,17 +155,60 @@ export function CrottsWidget() {
     clearHelpHash();
   }
 
+  async function onPickFile(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file || busy) return;
+    setBusy(true);
+    try {
+      const video = file.type.startsWith("video/");
+      const images = video ? await videoFrames(file) : [await photoDataUrl(file)].filter(Boolean);
+      if (!images.length) {
+        setMessages((current) => current.concat({
+          content: video
+            ? "I couldn't pull a frame from that video. Try a photo of the lie."
+            : "I couldn't read that photo. Try another one.",
+          id: messageId(idCounter),
+          kind: "err",
+        }));
+        return;
+      }
+      setShot({
+        images,
+        kind: video ? "video" : "photo",
+        label: video ? "Video frame" + (images.length > 1 ? "s" : "") + " attached" : "Photo attached",
+        preview: images[0],
+      });
+    } catch {
+      setMessages((current) => current.concat({
+        content: "I couldn't read that file. Try a photo of the lie.",
+        id: messageId(idCounter),
+        kind: "err",
+      }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendMessage() {
     const text = draft.trim();
-    if (!text || busy) return;
+    const attachment = shot;
+    if ((!text && !attachment) || busy) return;
 
     setBusy(true);
     setDraft("");
-    setMessages((current) => current.concat({ content: text, id: messageId(idCounter), kind: "me" }));
+    setShot(null);
+    const shown = [text, attachment ? attachment.label : ""].filter(Boolean).join("\n");
+    setMessages((current) => current.concat({ content: shown, id: messageId(idCounter), kind: "me" }));
 
     try {
+      const payload = { message: text, history: historyRef.current.slice(-8) };
+      if (attachment) {
+        payload.images = attachment.images;
+        payload.mediaKind = attachment.kind;
+      }
       const response = await fetch(`${api}/assistant`, {
-        body: JSON.stringify({ message: text, history: historyRef.current.slice(-8) }),
+        body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
@@ -183,7 +235,7 @@ export function CrottsWidget() {
       const actions = sanitizeCrottsActions(data && data.actions);
       setMessages((current) => current.concat({ actions, content: reply, id: messageId(idCounter), kind: "them" }));
       historyRef.current = historyRef.current.concat(
-        { role: "user", content: text },
+        { role: "user", content: shown },
         { role: "assistant", content: reply },
       ).slice(-16);
     } catch {
@@ -226,8 +278,13 @@ export function CrottsWidget() {
       ]),
       h("div", { id: "crotts-msgs", key: "messages", ref: messagesRef }, [
         ...messages.map((message) => h(AssistantBubble, { key: message.id, message })),
-        busy ? h("div", { className: "crotts-typing", key: "typing" }, "Crotts is typing...") : null,
+        busy ? h("div", { className: "crotts-typing", key: "typing" }, shot ? "Crotts is looking..." : "Crotts is typing...") : null,
       ]),
+      shot ? h("div", { className: "crotts-shot", key: "shot" }, [
+        h("img", { alt: "", key: "preview", src: shot.preview }),
+        h("span", { key: "label" }, shot.label + ". A still is a helper, not the card's call."),
+        h("button", { key: "clear", onClick: () => setShot(null), type: "button" }, "Remove"),
+      ]) : null,
       h("form", {
         id: "crotts-form",
         key: "form",
@@ -236,6 +293,23 @@ export function CrottsWidget() {
           void sendMessage();
         },
       }, [
+        h("input", {
+          accept: "image/*,video/*",
+          id: "crotts-file",
+          key: "file",
+          onChange: (event) => { void onPickFile(event); },
+          ref: fileRef,
+          type: "file",
+        }),
+        h("button", {
+          "aria-label": "Attach a photo or video of the lie",
+          disabled: busy,
+          id: "crotts-attach",
+          key: "attach",
+          onClick: () => fileRef.current?.click(),
+          title: "Photo or video of the lie",
+          type: "button",
+        }, icon(ImagePlus, 18)),
         h("textarea", {
           "aria-label": "Message Crotts",
           id: "crotts-input",
@@ -247,13 +321,13 @@ export function CrottsWidget() {
               void sendMessage();
             }
           },
-          placeholder: "Ask Crotts...",
+          placeholder: shot ? "What's the ruling?" : "Ask Crotts...",
           ref: inputRef,
           rows: 1,
           value: draft,
         }),
         h("button", {
-          disabled: busy || !draft.trim(),
+          disabled: busy || (!draft.trim() && !shot),
           id: "crotts-send",
           key: "send",
           type: "submit",

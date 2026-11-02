@@ -13,6 +13,7 @@ import { assignCards, type PlayerState } from "./scoring.js";
 import { weatherLocationForCourse } from "./weather.js";
 import { playersMatch } from "./player-identity.js";
 import { liveHolesWithPins, overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
+import { cardFromMine, handleThrowClips } from "./throw-clip-routes.js";
 
 type RosterPlayer = { memberId: string | null; name: string; division: string | null; startingHole: number | null; team: string | null };
 
@@ -285,6 +286,24 @@ export async function handleClubLive(
       headers: { "X-Auth-Member": id.authMember },
     });
     return json(await r.json().catch(() => ({})), r.status, origin);
+  }
+
+  if (sub === "clips") {
+    const tail = seg.slice(4);
+    if (method === "GET") {
+      return handleThrowClips({
+        request, env, origin, method, scope: "event", scopeKey: String(eid), tail,
+        authMember: null, card: null,
+      });
+    }
+    const id = await scoreIdentity(request, env, null);
+    if (!id.authMember) return json({ error: "unauthorized" }, 401, origin);
+    const mineRes = await stub.fetch("https://do/mine", { headers: { "X-Auth-Member": id.authMember } });
+    const mine = await mineRes.json().catch(() => ({}));
+    return handleThrowClips({
+      request, env, origin, method, scope: "event", scopeKey: String(eid), tail,
+      authMember: id.authMember, card: cardFromMine(mineRes.status, mine),
+    });
   }
 
   // Round control stays admin-only: start, finalize, cancel, and the round-scoped hole override.

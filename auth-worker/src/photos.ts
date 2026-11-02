@@ -49,6 +49,22 @@ export function decodeDataUrl(dataUrl: unknown): DecodedImage | null {
   return { bytes, contentType: sniffed, ext: EXT[sniffed] };
 }
 
+export const MAX_RULING_IMAGE_BYTES = 450_000;
+export const MAX_RULING_IMAGES = 3;
+
+/** Validated lie photos for a Crotts ruling. null means the client sent a bad image list. */
+export function takeRulingImages(value: unknown): DecodedImage[] | null {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > MAX_RULING_IMAGES) return null;
+  const images: DecodedImage[] = [];
+  for (const item of value) {
+    const image = decodeDataUrl(item);
+    if (!image || image.bytes.length > MAX_RULING_IMAGE_BYTES) return null;
+    images.push(image);
+  }
+  return images;
+}
+
 /** Server-controlled R2 key. courseId/hole are integers; uuid is server-generated — no user input. */
 export function teeSignKey(courseId: number, hole: number, ext: string, uuid: string): string {
   return `tee-signs/${courseId}/${hole}/${uuid}.${ext}`;

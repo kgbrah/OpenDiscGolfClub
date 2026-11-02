@@ -18,6 +18,7 @@ import { mintOpenPlaySession } from "./open-play.js";
 import { weatherLocationForCourse } from "./weather.js";
 import { buildCasualArchiveSnapshot, shouldUseCasualArchive } from "./casual-archive.js";
 import { liveHolesWithPins, overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
+import { cardFromMine, handleThrowClips } from "./throw-clip-routes.js";
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // unambiguous (no 0/O/1/I/L)
 function genCode(): string {
@@ -128,6 +129,13 @@ export async function handleCasualRounds(
     return json(await overlayLiveSnapshot(env, snapshot as Record<string, unknown>), live.status, origin);
   }
   if (sub === "live" && seg[3] === "ws") return stub.fetch(request);
+
+  if (sub === "live" && seg[3] === "clips" && method === "GET") {
+    return handleThrowClips({
+      request, env, origin, method, scope: "round", scopeKey: code, tail: seg.slice(4),
+      authMember: null, card: null,
+    });
+  }
 
   // Public read: durable finalized results (survives the DO's eviction; casual finalize persists to D1).
   // Redact internal ids (member_id / created_by) the same way the live snapshot does — names are enough for
@@ -247,6 +255,14 @@ export async function handleCasualRounds(
           body: JSON.stringify(patch),
         });
       },
+    });
+  }
+  if (sub === "live" && seg[3] === "clips") {
+    const mineRes = await stub.fetch("https://do/mine", { headers: hdr });
+    const mine = await mineRes.json().catch(() => ({}));
+    return handleThrowClips({
+      request, env, origin, method, scope: "round", scopeKey: code, tail: seg.slice(4),
+      authMember: actor.sub, card: cardFromMine(mineRes.status, mine),
     });
   }
   return json({ error: "not_found" }, 404, origin);

@@ -24,6 +24,7 @@ import {
   watchStrokeHoleChips,
   scoreMixRows,
 } from "./score-view-model.js";
+import { RoundHighlights } from "./throw-film.js";
 
 const h = React.createElement;
 
@@ -384,6 +385,7 @@ export function WatchView(props) {
     props.courseName || props.layoutName
       ? h("p", { className: "muted watch-meta", key: "meta" }, [props.courseName, props.layoutName].filter(Boolean).join(" · "))
       : null,
+    h(RoundHighlights, { highlightsOnly: true, key: "highlights" }),
     h(WatchHoles, {
       activeHoleIndex: props.activeHoleIndex,
       focus,

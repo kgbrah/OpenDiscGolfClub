@@ -25,6 +25,7 @@ const PERSONA = [
   "The club's calendar has two distinct kinds, listed separately in the context below: \"Events\" are disc golf tournaments and league rounds; \"Club events\" are fundraisers, meetings, and minutes. Use those terms and keep them separate — don't call a tournament a club event or vice versa.",
   "You know your disc golf history — the sport's origins, the North Carolina scene, and GVDG's own founding members and their PDGA profiles (all provided below) — and you love sharing it. Treat exact dates, winners, records, and current ratings as background; if you're not certain of a specific, say so rather than guess, and for a member's up-to-the-minute rating point them to their Members dashboard or pdga.com.",
   "Keep answers short (a few sentences). Never invent events, dates, or results that aren't in the context below.",
+  "If the visitor asks a rules question, answer from the rules helper notes when they are present. Say it is a helper, not the card's call and not a tournament director. Name the PDGA section and its link. Do not pretend a photo shows motion.",
 ].join(" ");
 
 // Background knowledge so Crotts can talk North Carolina disc golf history. General reference only — the
@@ -135,8 +136,10 @@ export function buildMessages(opts: {
   clubEvents?: { name: string; date?: string | null; status?: string | null }[];
   courses?: { name: string; location?: string | null }[];
   liveEvents?: { name: string; date?: string | null; status?: string | null }[];
+  rulesContext?: string;
 }): ChatMessage[] {
-  const system = `${PERSONA}\n\n--- Disc golf history (general background) ---\n${DISC_GOLF_HISTORY}\n\n--- North Carolina disc golf background ---\n${NC_DISC_GOLF}\n\n--- GVDG founding members & PDGA profiles ---\n${CLUB_MEMBERS}\n\n--- Current club context (live; always takes priority) ---\n${clubContext(opts.events ?? [], opts.clubEvents ?? [], opts.courses ?? [], opts.liveEvents ?? [])}`;
+  const rules = (opts.rulesContext ?? "").trim();
+  const system = `${PERSONA}\n\n--- Disc golf history (general background) ---\n${DISC_GOLF_HISTORY}\n\n--- North Carolina disc golf background ---\n${NC_DISC_GOLF}\n\n--- GVDG founding members & PDGA profiles ---\n${CLUB_MEMBERS}\n\n--- Current club context (live; always takes priority) ---\n${clubContext(opts.events ?? [], opts.clubEvents ?? [], opts.courses ?? [], opts.liveEvents ?? [])}${rules ? "\n\n--- " + rules : ""}`;
   const msgs: ChatMessage[] = [{ role: "system", content: system }];
 
   const clean = (opts.history ?? [])

@@ -159,3 +159,71 @@ export async function extractTeeSign(env: VisionEnv, bytes: Uint8Array, contentT
   }
   return { hole: null, layouts: [], source: null };
 }
+
+export const RULING_VISION_PROMPT =
+  "Describe this disc golf photo for a rules question. Say only what is visible: the disc, any painted line, " +
+  "water, rope, stake, mando sign or arrow, basket, other discs, and the player's feet if they are in frame. " +
+  "Do not give a ruling. If this is not a disc golf scene, say so. Three sentences at most.";
+
+async function geminiText(env: VisionEnv, bytes: Uint8Array, contentType: string, prompt: string): Promise<string> {
+  const model = env.GEMINI_VISION_MODEL || DEFAULT_GEMINI_VISION;
+  const modelId = model.replace(/^models\//, "");
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY || "" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [
+        { text: prompt },
+        { inlineData: { mimeType: contentType, data: base64Of(bytes) } },
+      ] }],
+      generationConfig: { maxOutputTokens: 300, temperature: 0 },
+    }),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error("gemini_" + res.status);
+  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  return geminiResponseText(data).trim();
+}
+
+async function openRouterText(env: VisionEnv, bytes: Uint8Array, contentType: string, prompt: string): Promise<string> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + env.OPENROUTER_API_KEY, "Content-Type": "application/json", "X-Title": "GVDG Crotts Ruling" },
+    body: JSON.stringify({
+      model: env.OPENROUTER_VISION_MODEL || DEFAULT_OR_VISION,
+      messages: [{ role: "user", content: [
+        { type: "text", text: prompt },
+        { type: "image_url", image_url: { url: dataUrlOf(bytes, contentType) } },
+      ] }],
+      max_tokens: 300,
+    }),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error("openrouter_" + res.status);
+  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  return (data?.choices?.[0]?.message?.content ?? "").trim();
+}
+
+async function workersAiText(env: VisionEnv, bytes: Uint8Array, prompt: string): Promise<string> {
+  const model = env.VISION_MODEL || DEFAULT_WAI_VISION;
+  const out = await Promise.race([
+    env.AI!.run(model, { image: Array.from(bytes), prompt, max_tokens: 300 }),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("workers_ai_timeout")), 12000)),
+  ]);
+  return (out?.response ?? "").trim();
+}
+
+/** Plain-language description of a lie photo. Empty string if no provider can read it. */
+export async function describeRulingImage(env: VisionEnv, bytes: Uint8Array, contentType: string): Promise<string> {
+  if (env.VISION_DEV_STUB) return "A disc is sitting beside a painted line. The basket is in the background.";
+  if (env.GEMINI_API_KEY) {
+    try { const text = await geminiText(env, bytes, contentType, RULING_VISION_PROMPT); if (text) return text; } catch { /* next */ }
+  }
+  if (env.OPENROUTER_API_KEY) {
+    try { const text = await openRouterText(env, bytes, contentType, RULING_VISION_PROMPT); if (text) return text; } catch { /* next */ }
+  }
+  if (env.AI) {
+    try { const text = await workersAiText(env, bytes, RULING_VISION_PROMPT); if (text) return text; } catch { /* next */ }
+  }
+  return "";
+}

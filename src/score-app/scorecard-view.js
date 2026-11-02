@@ -9,6 +9,7 @@ import { formatPct, holePlayStats, holeStatChips, liveRoundStatsFromCard } from 
 import { PotsStrip } from "./pots-strip.js";
 import { WeatherStrip } from "./weather-strip.js";
 import { nextHoleScore, relClass, relText, strokeLabel } from "./score-view-model.js";
+import { RoundHighlights, ThrowFilm } from "./throw-film.js";
 
 const h = React.createElement;
 
@@ -302,6 +303,7 @@ function RoundTools(props) {
       },
       [icon(Ruler), h("span", { key: "label" }, props.measureLabel || "Measure")],
     ),
+    h(ThrowFilm, { hole: props.hole, key: "film", rows: props.rows }),
     showManage
       ? h("button", { className: "score-glove-tool", key: "manage", type: "button", onClick: props.onManagePlayers }, [
         icon(Settings2),
@@ -1206,6 +1208,7 @@ export function ScorecardView(props) {
           measuring,
           onMeasure,
         }),
+        h(RoundHighlights, { hole: holeNumber, key: "clips" }),
         h(HoleGrid, { holes: props.holeGrid, onJump: props.onJumpHole }),
         h(HoleStatChips, { chips: holeStatChips(holePlayStats(props.hole, throws, ((props.holeGrid || []).find((hole) => hole.current) || {}).score)) }),
         props.showPots ? h(PotsStrip, { key: "pots", pots: props.pots }) : null,
