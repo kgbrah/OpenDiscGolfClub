@@ -357,11 +357,17 @@ function HoleHeader(props) {
   ]);
 }
 
+function finiteCoord(value) {
+  if (value == null || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 function holeHasMap(hole) {
   const tee = hole && hole.tee;
   const basket = hole && hole.target;
-  return Number.isFinite(Number(tee && tee.lat)) && Number.isFinite(Number(tee && tee.lng))
-    && Number.isFinite(Number(basket && basket.lat)) && Number.isFinite(Number(basket && basket.lng));
+  return finiteCoord(tee && tee.lat) != null && finiteCoord(tee && tee.lng) != null
+    && finiteCoord(basket && basket.lat) != null && finiteCoord(basket && basket.lng) != null;
 }
 
 function useDeviceFix() {
@@ -513,7 +519,7 @@ function markerSaved(hole, kind, surveyed) {
 }
 
 function pointReady(point) {
-  return Number.isFinite(Number(point && point.lat)) && Number.isFinite(Number(point && point.lng));
+  return finiteCoord(point && point.lat) != null && finiteCoord(point && point.lng) != null;
 }
 
 function HoleMedia(props) {

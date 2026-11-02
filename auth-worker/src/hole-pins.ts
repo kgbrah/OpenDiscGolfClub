@@ -11,10 +11,16 @@ export type PinHole = {
   target?: PinMarker | null;
 };
 
+function finiteCoord(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 export function markerHasPin(marker: unknown): boolean {
   if (!marker || typeof marker !== "object") return false;
   const source = marker as PinMarker;
-  return Number.isFinite(Number(source.lat)) && Number.isFinite(Number(source.lng));
+  return finiteCoord(source.lat) != null && finiteCoord(source.lng) != null;
 }
 
 /** Positions named "Hole N tee" / "Hole N basket" become hole donors. Other labels are ignored. */
@@ -30,9 +36,9 @@ export function holesFromPositionLabels(positions: readonly unknown[] | null | u
     const kindRaw = match[2];
     if (!holeRaw || !kindRaw) continue;
     const hole = Number(holeRaw);
-    const lat = Number(source.lat);
-    const lng = Number(source.lng);
-    if (!Number.isInteger(hole) || hole < 1 || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const lat = finiteCoord(source.lat);
+    const lng = finiteCoord(source.lng);
+    if (!Number.isInteger(hole) || hole < 1 || lat == null || lng == null) continue;
     const kind = kindRaw.toLowerCase() === "tee" ? "tee" : "target";
     const current = byHole.get(hole) || { hole };
     current[kind] = { label, lat, lng };
@@ -43,7 +49,7 @@ export function holesFromPositionLabels(positions: readonly unknown[] | null | u
 
 function donorPin(marker: PinMarker | null | undefined): PinMarker | null {
   if (!markerHasPin(marker) || !marker) return null;
-  return { label: marker.label ?? null, lat: Number(marker.lat), lng: Number(marker.lng) };
+  return { label: marker.label ?? null, lat: finiteCoord(marker.lat) as number, lng: finiteCoord(marker.lng) as number };
 }
 
 function mergedMarker(

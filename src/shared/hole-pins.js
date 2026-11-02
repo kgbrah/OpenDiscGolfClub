@@ -2,9 +2,15 @@
 // Fill blank tee/basket coordinates from mapped donors. Never replace a pin
 // that is already on the hole, and never treat device GPS as a pin.
 
+function finiteCoord(value) {
+  if (value == null || value === "") return null;
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 export function markerHasPin(marker) {
   if (!marker || typeof marker !== "object") return false;
-  return Number.isFinite(Number(marker.lat)) && Number.isFinite(Number(marker.lng));
+  return finiteCoord(marker.lat) != null && finiteCoord(marker.lng) != null;
 }
 
 /** Positions named "Hole N tee" / "Hole N basket" become hole donors. Other labels are ignored. */
@@ -16,9 +22,9 @@ export function holesFromPositionLabels(positions) {
     const match = /^Hole\s+(\d+)\s+(tee|basket)$/i.exec(label);
     if (!match) continue;
     const hole = Number(match[1]);
-    const lat = Number(row.lat);
-    const lng = Number(row.lng);
-    if (!Number.isInteger(hole) || hole < 1 || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const lat = finiteCoord(row.lat);
+    const lng = finiteCoord(row.lng);
+    if (!Number.isInteger(hole) || hole < 1 || lat == null || lng == null) continue;
     const kind = match[2].toLowerCase() === "tee" ? "tee" : "target";
     const current = byHole.get(hole) || { hole };
     current[kind] = { label, lat, lng };
@@ -29,7 +35,7 @@ export function holesFromPositionLabels(positions) {
 
 function donorPin(marker) {
   if (!markerHasPin(marker)) return null;
-  return { label: marker.label ?? null, lat: Number(marker.lat), lng: Number(marker.lng) };
+  return { label: marker.label ?? null, lat: finiteCoord(marker.lat), lng: finiteCoord(marker.lng) };
 }
 
 function mergedMarker(existing, donor) {

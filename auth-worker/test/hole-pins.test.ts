@@ -12,7 +12,7 @@ describe("hole pins", () => {
     expect(markerHasPin(donors[0]?.tee)).toBe(true);
     const holes = fillMissingHolePins(
       [
-        { hole: 1, par: 4, distance_ft: 565, tee: { label: "Blue" }, target: { label: "Main" } },
+        { hole: 1, par: 4, distance_ft: 565, tee: { label: "Blue", lat: null, lng: null }, target: { label: "Main", lat: null, lng: null } },
         { hole: 3, par: 3, tee: { label: "Blue", lat: 35.1, lng: -77.1 }, target: { label: "Main", lat: 35.2, lng: -77.2 } },
       ],
       [donors, [{ hole: 3, tee: { lat: 9, lng: 9 }, target: { lat: 8, lng: 8 } }]],

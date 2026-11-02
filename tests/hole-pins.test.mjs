@@ -17,7 +17,7 @@ test("Hole N tee and basket labels restore a blank hole without moving a pinned 
   assert.equal(donors.length, 1);
   assert.equal(markerHasPin(donors[0].tee), true);
   const holes = fillMissingHolePins([
-    { hole: 1, par: 4, distance_ft: 565, tee: { label: "Blue" }, target: { label: "Main" } },
+    { hole: 1, par: 4, distance_ft: 565, tee: { label: "Blue", lat: null, lng: null }, target: { label: "Main", lat: null, lng: null } },
     {
       hole: 3,
       par: 3,
