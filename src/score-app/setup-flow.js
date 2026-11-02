@@ -394,7 +394,11 @@ function SetupPickView({ layout, defaultConfig, notice, onBack, onCreate }) {
                 key: option.value,
                 "aria-pressed": pressed ? "true" : "false",
                 [group.attr]: option.value,
-                onClick: () => setSelected((current) => ({ ...current, [group.key]: option.value })),
+                onClick: () => setSelected((current) => {
+                  const next = { ...current, [group.key]: option.value };
+                  if (group.key === "scoringStyle" && option.value === "matchplay") next.handicap = false;
+                  return next;
+                }),
               },
               [
                 h("span", { className: "title", key: "title" }, option.title),
@@ -405,6 +409,32 @@ function SetupPickView({ layout, defaultConfig, notice, onBack, onCreate }) {
         ),
       ]),
     ),
+    h("div", { className: "card stack", key: "handicap" }, [
+      h("label", { className: "lbl", key: "label" }, "Handicap scoring"),
+      h("div", { className: "setup-grid", key: "grid" }, [
+        ["off", "Off", "Rank this round as shot"],
+        ["on", "On", "Rank start plus this round"],
+      ].map(([value, title, sub]) => {
+        const stroke = selected.scoringStyle !== "matchplay";
+        const on = stroke && selected.handicap === true;
+        const pressed = value === "on" ? on : !on;
+        return h("button", {
+          "aria-pressed": pressed ? "true" : "false",
+          className: "setup-option",
+          "data-handicap": value,
+          disabled: !stroke && value === "on",
+          key: value,
+          type: "button",
+          onClick: () => setSelected((current) => ({ ...current, handicap: value === "on" && current.scoringStyle !== "matchplay" })),
+        }, [
+          h("span", { className: "title", key: "title" }, title),
+          h("span", { className: "sub", key: "sub" }, sub),
+        ]);
+      })),
+      selected.scoringStyle === "matchplay"
+        ? h("p", { className: "muted", key: "note" }, "Match play stays head to head. Handicap is for stroke play.")
+        : h("p", { className: "muted", key: "note" }, "Off by default. Turn it on to rank this card with club handicaps."),
+    ]),
     h("div", { className: "card stack", key: "code" }, [
       h("label", { className: "lbl", htmlFor: "roundCode", key: "label" }, "Share code"),
       h("input", {

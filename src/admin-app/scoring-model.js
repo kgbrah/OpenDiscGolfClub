@@ -13,6 +13,7 @@ export function normalizeConfig(raw, fallbackPlayFormat = null, fallbackEventFor
     return {
       groupFormat: fallbackPlayFormat === "doubles" || raw.groupFormat === "doubles" ? "doubles" : "singles",
       scoringStyle: raw.scoringStyle === "matchplay" ? "matchplay" : "stroke",
+      handicap: raw.scoringStyle !== "matchplay" && raw.handicap === true,
     };
   }
   if (typeof raw === "string" && raw.trim()) {
@@ -25,6 +26,7 @@ export function normalizeConfig(raw, fallbackPlayFormat = null, fallbackEventFor
   return {
     groupFormat: fallbackPlayFormat === "doubles" ? "doubles" : "singles",
     scoringStyle: fallbackEventFormat === "matchplay" ? "matchplay" : "stroke",
+    handicap: false,
   };
 }
 

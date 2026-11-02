@@ -210,8 +210,12 @@ test('NC course catalog seeds every listed North Carolina course', () => {
 test('createRound sends explicit live scoring config defaults and selections', () => {
   const setup = scoreSetupSource();
   const legacy = scoreControllerSetupSource();
-  assert.match(legacy, /return \{ groupFormat: 'singles', scoringStyle: 'stroke' \};/);
-  assert.match(setup, /setSelected\(\(current\) => \(\{ \.\.\.current, \[group\.key\]: option\.value \}\)\)/);
+  assert.match(legacy, /return \{ groupFormat: 'singles', scoringStyle: 'stroke', handicap: false \};/);
+  assert.match(setup, /\[group\.key\]: option\.value/);
+  assert.match(setup, /data-handicap/);
+  assert.match(setup, /Handicap scoring/);
+  assert.match(legacy, /handicap: liveScoringConfig\.handicap === true/);
+  assert.match(readFileSync('src/score-app/score-controller.js', 'utf8'), /handicapScoringEnabled/);
   assert.match(setup, /onCreate\(\{ \.\.\.selected, code \}\)/);
   assert.match(setup, /htmlFor: "roundCode"/);
   assert.match(legacy, /const liveScoringConfig = config \|\| defaultLiveScoringConfig\(\);/);

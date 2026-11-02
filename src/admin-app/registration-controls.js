@@ -187,6 +187,7 @@ function SettingsForm({ state }) {
         liveScoringConfig: {
           groupFormat: form.playFormat === "doubles" ? "doubles" : "singles",
           scoringStyle: existing.scoringStyle,
+          handicap: existing.handicap === true && existing.scoringStyle !== "matchplay",
         },
         play_format: form.playFormat || null,
         registration_open: form.registrationOpen,

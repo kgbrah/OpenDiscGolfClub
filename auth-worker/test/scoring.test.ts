@@ -410,7 +410,20 @@ describe("live scoring format helpers", () => {
     const config = normalizeLiveScoringConfig(undefined);
 
     // Then it remains compatible with existing singles stroke scoring.
-    expect(config).toEqual({ groupFormat: "singles", scoringStyle: "stroke" });
+    expect(config).toEqual({ groupFormat: "singles", scoringStyle: "stroke", handicap: false });
+  });
+
+  it("keeps handicap only for stroke play", () => {
+    expect(normalizeLiveScoringConfig({ groupFormat: "singles", scoringStyle: "stroke", handicap: true })).toEqual({
+      groupFormat: "singles",
+      scoringStyle: "stroke",
+      handicap: true,
+    });
+    expect(normalizeLiveScoringConfig({ groupFormat: "singles", scoringStyle: "matchplay", handicap: true })).toEqual({
+      groupFormat: "singles",
+      scoringStyle: "matchplay",
+      handicap: false,
+    });
   });
 
   it("returns one singles score target per active player", () => {

@@ -21,7 +21,7 @@ import {
     udiscExportData,
 } from "./score-view-model.js";
 import { layoutHoles, matchCourseByName, rememberLastCourse, sortLayoutsForPick } from "./course-pick.js";
-import { decorateStandings } from "../shared/handicap.js";
+import { decorateStandings, handicapScoringEnabled } from "../shared/handicap.js";
 import { resolveApiBase } from "../shared/api-base.js";
 import { clearMemberSession, readMemberToken, writeMemberSession } from "../shared/member-session.js";
 import { createWakeLock } from "../shared/wake-lock.js";
@@ -778,14 +778,18 @@ export function startScoreApp(options) {
         if (scoreShell && typeof scoreShell.setLeaderboardHandler === 'function') scoreShell.setLeaderboardHandler(openLeaderboard);
         function closeLeaderboard() { lbOpen = false; leaderboardSheet.close(); }
         function boardStandings(rows) {
-            if (isMatchplayScoring(S)) return Array.isArray(rows) ? rows : [];
+            if (!handicapScoringEnabled(S.roundConfig)) return Array.isArray(rows) ? rows : [];
             return decorateStandings(rows, S.handicaps);
         }
         function ensureHandicaps(layoutId) {
-            if (isMatchplayScoring(S)) {
+            if (!handicapScoringEnabled(S.roundConfig)) {
+                S.handicapTicket += 1;
+                const had = S.handicaps != null;
                 S.handicaps = null;
                 S.handicapLayoutId = null;
                 S.handicapLoading = false;
+                if (had && lbOpen) renderLeaderboard();
+                if (had && WATCH) renderWatch();
                 return;
             }
             const id = Number(layoutId);
@@ -1069,7 +1073,7 @@ export function startScoreApp(options) {
             });
         }
         function defaultLiveScoringConfig() {
-            return { groupFormat: 'singles', scoringStyle: 'stroke' };
+            return { groupFormat: 'singles', scoringStyle: 'stroke', handicap: false };
         }
         function renderSetupPick(course, layout, notice) {
             renderSetupFlow({
@@ -1090,7 +1094,7 @@ export function startScoreApp(options) {
                 return;
             }
             renderLoading();
-            const body = { course_id: course.id, layout_id: layout.id, liveScoringConfig: { groupFormat: liveScoringConfig.groupFormat, scoringStyle: liveScoringConfig.scoringStyle } };
+            const body = { course_id: course.id, layout_id: layout.id, liveScoringConfig: { groupFormat: liveScoringConfig.groupFormat, scoringStyle: liveScoringConfig.scoringStyle, handicap: liveScoringConfig.handicap === true && liveScoringConfig.scoringStyle !== 'matchplay' } };
             if (requested) body.code = requested;
             const r = await api('/rounds', { method: 'POST', body: body });
             if (r.ok && r.data && r.data.code) {

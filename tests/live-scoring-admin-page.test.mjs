@@ -25,7 +25,9 @@ test('admin live start area sends normalized scoring config', () => {
   assert.match(panel, /\{ label: "Singles", value: "singles" \}/);
   assert.match(panel, /\{ label: "Doubles", value: "doubles" \}/);
   assert.match(panel, /\{ label: "Stroke play", value: "stroke" \}/);
-  assert.match(panel, /\{ label: "Match play", value: "matchplay" \}/);
+  assert.match(panel, /name: "scHandicap"/);
+  assert.match(panel, /\{ label: "Off", value: "off" \}/);
+  assert.match(panel, /\{ label: "On", value: "on" \}/);
   assert.doesNotMatch(panel, /h\("select", \{[^}]*id: "scGroupFormat"/);
   assert.match(html, /import \{ normalizeConfig as normalizeScoringConfig \} from "\.\/scoring-model\.js"/);
   assert.match(html, /function scCurrentConfig\(config\)/);

@@ -122,9 +122,17 @@ function StartControls({ state }) {
         key: "style",
         label: "Scoring",
         name: "scScoringStyle",
-        onChange: (value) => updateConfig({ scoringStyle: value }),
+        onChange: (value) => updateConfig(value === "matchplay" ? { scoringStyle: value, handicap: false } : { scoringStyle: value }),
         options: [{ label: "Stroke play", value: "stroke" }, { label: "Match play", value: "matchplay" }],
         value: config.scoringStyle,
+      }),
+      h(FormatButtons, {
+        key: "handicap",
+        label: "Handicap",
+        name: "scHandicap",
+        onChange: (value) => updateConfig({ handicap: value === "on" && config.scoringStyle !== "matchplay" }),
+        options: [{ label: "Off", value: "off" }, { label: "On", value: "on" }],
+        value: config.scoringStyle !== "matchplay" && config.handicap === true ? "on" : "off",
       }),
       h("button", { className: "admin-btn", disabled: pending, id: "scStartBtn", key: "start", onClick: start, type: "button" }, pending ? "Starting..." : "Start live scoring"),
       h("button", {
@@ -139,7 +147,7 @@ function StartControls({ state }) {
       }, "Add players"),
     ]),
     h("p", { className: "al-note", id: "scStartValidation", key: "validation", role: validation ? "status" : undefined }, validation),
-    h("p", { className: "al-note", key: "note" }, "An event needs a layout with pars to score. Pick one here, or set it on the Layouts tab. Doubles match play also needs players with pair labels in Registration — Start will refuse an empty roster."),
+    h("p", { className: "al-note", key: "note" }, "Handicap ranks stroke play by each player's start plus this round. Leave it off to score the round as shot. An event still needs a layout with pars, and doubles match play needs pair labels in Registration."),
   ]);
 }
 

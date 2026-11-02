@@ -358,7 +358,7 @@ describe("admin event management", () => {
 
     expect(res.status).toBe(200);
     expect(state.eventConfigBinds?.[6]).toBe("doubles");
-    expect(JSON.parse(String(state.eventConfigBinds?.[8]))).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay" });
+    expect(JSON.parse(String(state.eventConfigBinds?.[8]))).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay", handicap: false });
   });
 
   it("preserves legacy matchplay when admin saves config without explicit live scoring config", async () => {
@@ -372,7 +372,7 @@ describe("admin event management", () => {
     }, await token("m_admin"), state);
 
     expect(res.status).toBe(200);
-    expect(JSON.parse(String(state.eventConfigBinds?.[8]))).toEqual({ groupFormat: "singles", scoringStyle: "matchplay" });
+    expect(JSON.parse(String(state.eventConfigBinds?.[8]))).toEqual({ groupFormat: "singles", scoringStyle: "matchplay", handicap: false });
   });
 
   it("upgrades stored singles groupFormat when play_format is saved as doubles", async () => {
@@ -391,7 +391,7 @@ describe("admin event management", () => {
 
     expect(res.status).toBe(200);
     expect(state.eventConfigBinds?.[6]).toBe("doubles");
-    expect(JSON.parse(String(state.eventConfigBinds?.[8]))).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay" });
+    expect(JSON.parse(String(state.eventConfigBinds?.[8]))).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay", handicap: false });
   });
 
   it("rejects unsupported live scoring config values before writing event config", async () => {

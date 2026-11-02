@@ -10,6 +10,10 @@ export const HANDICAP_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 
 const ALLOWANCE = { 1: 0.5, 2: 0.75 };
 
+export function handicapScoringEnabled(config) {
+  return Boolean(config && config.handicap === true && config.scoringStyle !== "matchplay");
+}
+
 export function handicapKey(memberId) {
   const id = String(memberId || "").trim();
   if (!id || id.startsWith("g_") || id.startsWith("op_")) return "";

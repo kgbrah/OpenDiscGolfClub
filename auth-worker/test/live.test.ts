@@ -434,7 +434,7 @@ describe("live route start payloads", () => {
 
     expect(res.status).toBe(200);
     expect(state.starts).toHaveLength(1);
-    expect(state.starts[0]?.liveScoringConfig).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay" });
+    expect(state.starts[0]?.liveScoringConfig).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay", handicap: false });
     expect(state.starts[0]?.players).toEqual([
       { memberId: "m_a", name: "A", division: "MA1", startingHole: 1, team: "Pair 1", ctpEligible: true },
       { memberId: "m_b", name: "B", division: "MA1", startingHole: 1, team: "Pair 1", ctpEligible: true },
@@ -464,7 +464,7 @@ describe("live route start payloads", () => {
     const res = await liveRouteCall("/events/9/live/start", "POST", {}, state);
 
     expect(res.status).toBe(200);
-    expect(state.starts[0]?.liveScoringConfig).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay" });
+    expect(state.starts[0]?.liveScoringConfig).toEqual({ groupFormat: "doubles", scoringStyle: "matchplay", handicap: false });
   });
 
   it("unionRosterPlayers merges registered + manual, dedupes by member then name, registration wins", () => {
@@ -629,7 +629,7 @@ describe("live route start payloads", () => {
     }, state, "m_jane");
 
     expect(res.status).toBe(201);
-    expect(state.starts[0]?.liveScoringConfig).toEqual({ groupFormat: "doubles", scoringStyle: "stroke" });
+    expect(state.starts[0]?.liveScoringConfig).toEqual({ groupFormat: "doubles", scoringStyle: "stroke", handicap: false });
     expect(state.starts[0]?.players).toEqual([{ memberId: "m_jane", name: "Jane", team: "Pair A" }]);
   });
 
@@ -1851,7 +1851,7 @@ describe("LiveEventDO finish-card", () => {
 
 describe("LiveEventDO config-aware score targets and final results", () => {
   const holes = [{ hole: 1, par: 3 }, { hole: 2, par: 3 }];
-  const doublesConfig = { groupFormat: "doubles", scoringStyle: "stroke" };
+  const doublesConfig = { groupFormat: "doubles", scoringStyle: "stroke", handicap: false };
 
   const startDoubles = (live: LiveEventDO) =>
     live.fetch(new Request("https://do/start", {
@@ -2111,7 +2111,7 @@ describe("LiveEventDO config-aware score targets and final results", () => {
 
 describe("LiveEventDO per-card scoring isolation (P2-C)", () => {
   const holes = [{ hole: 1, par: 3 }, { hole: 2, par: 3 }];
-  const doublesConfig = { groupFormat: "doubles", scoringStyle: "stroke" };
+  const doublesConfig = { groupFormat: "doubles", scoringStyle: "stroke", handicap: false };
   const matchplayConfig = { groupFormat: "singles", scoringStyle: "matchplay" };
 
   const post = (live: LiveEventDO, headers: Record<string, string>, body: unknown) =>

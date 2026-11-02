@@ -4,6 +4,7 @@ export type LiveScoringStyle = "stroke" | "matchplay";
 export type LiveScoringConfig = {
   readonly groupFormat: LiveGroupFormat;
   readonly scoringStyle: LiveScoringStyle;
+  readonly handicap?: boolean;
 };
 
 export type ScoreTarget =
@@ -44,7 +45,12 @@ export class LiveFormatError extends Error {
 const DEFAULT_LIVE_SCORING_CONFIG = {
   groupFormat: "singles",
   scoringStyle: "stroke",
+  handicap: false,
 } satisfies LiveScoringConfig;
+
+function parseHandicap(value: unknown, scoringStyle: LiveScoringStyle): boolean {
+  return scoringStyle === "stroke" && value === true;
+}
 
 export function normalizePairLabel(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -57,9 +63,11 @@ export function normalizeLiveScoringConfig(value: unknown): LiveScoringConfig {
   if (!isRecord(value)) {
     throw new LiveFormatError("invalid_group_format", "live scoring config must be an object");
   }
+  const scoringStyle = parseScoringStyle(value["scoringStyle"]);
   return {
     groupFormat: parseGroupFormat(value["groupFormat"]),
-    scoringStyle: parseScoringStyle(value["scoringStyle"]),
+    scoringStyle,
+    handicap: parseHandicap(value["handicap"], scoringStyle),
   };
 }
 
@@ -94,7 +102,7 @@ export function normalizeLiveScoringConfigFromLegacy(value: {
   const groupFormat = value.play_format === "doubles"
     ? "doubles"
     : (explicit ? explicit.groupFormat : "singles");
-  return { groupFormat, scoringStyle };
+  return { groupFormat, scoringStyle, handicap: scoringStyle === "stroke" && explicit?.handicap === true };
 }
 
 export function isLiveFormatError(error: unknown): error is LiveFormatError {

@@ -6,10 +6,18 @@ import {
   handicapFromToPars,
   handicapKey,
   handicapsFromRounds,
+  handicapScoringEnabled,
   myLayoutHandicaps,
 } from "../src/shared/handicap.js";
 
 const NOW = new Date("2026-11-02T12:00:00Z");
+
+test("handicap scoring is opt-in and stroke only", () => {
+  assert.equal(handicapScoringEnabled({ scoringStyle: "stroke", handicap: true }), true);
+  assert.equal(handicapScoringEnabled({ scoringStyle: "stroke" }), false);
+  assert.equal(handicapScoringEnabled({ scoringStyle: "matchplay", handicap: true }), false);
+  assert.equal(handicapScoringEnabled(null), false);
+});
 
 test("handicap key is stable and hides guests", () => {
   assert.equal(handicapKey("m_jane"), "f80beab03abc5111");
