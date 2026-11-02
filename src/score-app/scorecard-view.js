@@ -391,6 +391,10 @@ function useDeviceFix() {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       const next = { lat, lng };
       if (Number.isFinite(pos.coords && pos.coords.accuracy)) next.accuracyM = pos.coords.accuracy;
+      const prev = fixRef.current;
+      // Phone GPS jitters a few meters. Repainting on every tick reloads the
+      // hole picture. Keep the last fix until the phone actually moves.
+      if (prev && Math.abs(prev.lat - lat) < 0.00008 && Math.abs(prev.lng - lng) < 0.00008) return;
       fixRef.current = next;
       setFix(next);
       setStatus("ready");
@@ -428,6 +432,9 @@ function useDeviceFix() {
     enableGps();
     function onResume() {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      // A live watch already delivers the next fix. Restarting it on every
+      // focus (Android picture-in-picture does this constantly) flashes the map.
+      if (watchId.current != null) return;
       enableGps();
     }
     document.addEventListener("visibilitychange", onResume);
@@ -508,7 +515,7 @@ function pointReady(point) {
 
 function HoleMedia(props) {
   const [signOpen, setSignOpen] = React.useState(false);
-  const hasMap = holeHasMap(props.hole) || pointReady(props.hole && props.hole.tee) || pointReady(props.hole && props.hole.target) || pointReady(props.gpsFix);
+  const hasMap = holeHasMap(props.hole) || pointReady(props.hole && props.hole.tee) || pointReady(props.hole && props.hole.target);
   const hasSign = Boolean(props.teeSign);
   const canSurvey = typeof props.onMarkTee === "function" || typeof props.onMarkPin === "function";
   if (!hasMap && !hasSign && !canSurvey) return null;
@@ -552,7 +559,6 @@ function HoleMedia(props) {
           }),
           key: "map-card",
           lie: props.lie,
-          here: props.gpsFix,
           measureFrom: props.measureFrom,
           measureTo: props.measureTo,
           players: withSelfLocation(props.playerLocations, props.gpsFix, props.selfMark),

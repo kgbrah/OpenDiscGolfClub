@@ -92,6 +92,59 @@ export function startScoreApp(options) {
                 localStorage.setItem(RECENT_ROUNDS_KEY, JSON.stringify(next));
             } catch (e) {}
         }
+        function forgetRecentRound(code) {
+            try {
+                const key = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (!key) return false;
+                const rows = JSON.parse(localStorage.getItem(RECENT_ROUNDS_KEY) || '[]');
+                const list = Array.isArray(rows) ? rows : [];
+                const next = list.filter(function (row) {
+                    return String(row && row.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '') !== key;
+                });
+                if (next.length === list.length) return false;
+                localStorage.setItem(RECENT_ROUNDS_KEY, JSON.stringify(next));
+                return true;
+            } catch (e) { return false; }
+        }
+        let pruningRecent = false;
+        async function stillOnRecentRound(code) {
+            const live = await api('/rounds/' + code + '/live', { auth: false, guest: false });
+            if (live.neterr) return true;
+            if (live.status === 404) return false;
+            if (!live.ok || !live.data) return true;
+            if (live.data.status !== 'live') return false;
+            if (!scoringToken()) return true;
+            const mine = await api('/rounds/' + code + '/live/mine');
+            if (mine.neterr || mine.status === 401 || mine.status === 403) return true;
+            if (mine.status === 404) return false;
+            if (!mine.ok || !mine.data) return true;
+            if (mine.data.status !== 'live') return false;
+            return mine.data.cardId != null && Array.isArray(mine.data.cardmates) && mine.data.cardmates.length > 0;
+        }
+        async function pruneLeftRounds() {
+            if (pruningRecent) return false;
+            pruningRecent = true;
+            try {
+                const rows = JSON.parse(localStorage.getItem(RECENT_ROUNDS_KEY) || '[]');
+                const list = Array.isArray(rows) ? rows : [];
+                const checks = await Promise.all(list.map(async function (row) {
+                    const code = String(row && row.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (!code) return false;
+                    try { return await stillOnRecentRound(code); }
+                    catch (e) { return true; }
+                }));
+                let changed = false;
+                list.forEach(function (row, index) {
+                    if (checks[index]) return;
+                    if (forgetRecentRound(row && row.code)) changed = true;
+                });
+                return changed;
+            } catch (e) {
+                return false;
+            } finally {
+                pruningRecent = false;
+            }
+        }
         function toast(msg) {
             notifications.showToast(msg);
         }
@@ -983,7 +1036,10 @@ export function startScoreApp(options) {
             }
             const d = r.data;
             if (d.cardId == null || !Array.isArray(d.cardmates) || !d.cardmates.length) {
-                if (MODE === 'round') renderMessage('Round not found', 'That round code isn’t active. Double-check it, or start a new round.', true);
+                if (MODE === 'round') {
+                    forgetRecentRound(ROUND_CODE);
+                    renderMessage('Round not found', 'That round code isn’t active. Double-check it, or start a new round.', true);
+                }
                 else renderMessage('No card yet', 'Either the round hasn’t started or you’re not on a card for this event. Ask an admin to start the round and assign cards.', true);
                 return;
             }
@@ -1010,6 +1066,9 @@ export function startScoreApp(options) {
                 onInvalidCode: function () { toast('Enter a valid code'); },
                 onSignOut: signOut,
                 onSignIn: function () { renderLogin(); }
+            });
+            pruneLeftRounds().then(function (changed) {
+                if (changed && MODE === 'home') renderHome();
             });
         }
         async function renderCourseMap(query) {
@@ -1184,7 +1243,11 @@ export function startScoreApp(options) {
             closeManagePlayers();
             if (r.status === 409 && r.data && r.data.error === 'player_moved') { await loadMine(); toast('Card changed — open Manage again'); return; }
             if (!r.ok || !r.data) { toast('Could not remove player'); return; }
-            if (r.data.cardId == null) { location.href = location.pathname; return; } // I left the round → back to home
+            if (r.data.cardId == null) {
+                forgetRecentRound(ROUND_CODE);
+                location.href = location.pathname;
+                return;
+            } // I left the round → back to home
             S.cardId = r.data.cardId; S.myIndex = r.data.playerIndex; S.cardmates = Array.isArray(r.data.cardmates) ? r.data.cardmates : S.cardmates;
             renderHole();
             toast(p.name + ' removed');

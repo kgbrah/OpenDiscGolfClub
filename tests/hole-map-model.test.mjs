@@ -53,22 +53,26 @@ test("projectHoleMap hides identical tee and basket points", () => {
   }), null);
 });
 
-test("a hole with only a tee or only a GPS fix still frames a map", () => {
+test("a hole with only a tee still frames a map, and GPS does not", () => {
   const teeOnly = projectLooseHoleMap({ tee: { lat: 35.61, lng: -77.37 } });
   assert.equal(teeOnly.loose, true);
   assert.ok(teeOnly.tee);
   assert.equal(teeOnly.basket, null);
   assert.ok(teeOnly.satelliteUrl);
-  const here = projectLooseHoleMap({}, { here: { lat: 35.62, lng: -77.36 } });
-  assert.equal(here.loose, true);
-  assert.equal(here.tee, null);
-  assert.ok(here.bounds.maxLat > here.bounds.minLat);
+  assert.equal(projectLooseHoleMap({}, { here: { lat: 35.62, lng: -77.36 } }), null);
+  const chased = projectLooseHoleMap({ tee: { lat: 35.61, lng: -77.37 } }, { here: { lat: 40, lng: -90 } });
+  assert.equal(chased.satelliteUrl, teeOnly.satelliteUrl);
   const full = projectLooseHoleMap({
     tee: { lat: 35.61, lng: -77.37 },
     target: { lat: 35.62, lng: -77.36 },
   });
   assert.equal(full.loose, undefined);
   assert.ok(full.tee && full.basket);
+  const fullChased = projectLooseHoleMap({
+    tee: { lat: 35.61, lng: -77.37 },
+    target: { lat: 35.62, lng: -77.36 },
+  }, { here: { lat: 40, lng: -90 } });
+  assert.equal(fullChased.satelliteUrl, full.satelliteUrl);
 });
 
 test("heading and wind helpers stay on the compass", () => {

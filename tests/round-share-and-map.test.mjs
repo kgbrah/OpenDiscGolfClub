@@ -15,6 +15,11 @@ test("a live round can be shared by code and an unmapped hole can be pinned", ()
   assert.match(controller, /onShareCode: ROUND_CODE \? shareJoinCode : null/);
   assert.match(view, /Use \" \+ value/);
   assert.match(readFileSync("src/score-app/setup-flow.js", "utf8"), /Jump back in/);
+  assert.match(controller, /function forgetRecentRound/);
+  assert.match(controller, /forgetRecentRound\(ROUND_CODE\)/);
+  assert.match(controller, /function pruneLeftRounds/);
+  assert.doesNotMatch(view, /pointReady\(props\.gpsFix\)/);
+  assert.doesNotMatch(readFileSync("src/shared/hole-map.js", "utf8"), /here: props\.here/);
   assert.match(readFileSync("src/shared/hole-map-model.js", "utf8"), /export function projectLooseHoleMap/);
   assert.match(home, /data-react-home-pdga/);
   assert.match(readFileSync("src/members-app/pdga-events-panel.js", "utf8"), /AddToCalendarButton/);

@@ -560,14 +560,17 @@ function uniquePoints(points) {
   return out;
 }
 
-/** Satellite frame for a hole that does not have both a tee and a basket yet. */
+/** Satellite frame for a hole that does not have both a tee and a basket yet.
+ *  Device GPS is never a camera anchor — that pulled the picture onto the
+ *  phone and reloaded imagery on every fix. The player dot is drawn later
+ *  only if it falls inside this frame.
+ */
 export function projectLooseHoleMap(hole, options = {}) {
   const strict = projectHoleMap(hole, options);
   if (strict) return strict;
   const tee = holePoint(hole && hole.tee);
   const basket = holePoint(hole && hole.target);
-  const here = holePoint(options.here);
-  const anchors = uniquePoints([tee, basket, here]);
+  const anchors = uniquePoints([tee, basket]);
   if (!anchors.length) return null;
   const width = finite(options.width) || 640;
   const height = finite(options.height) || 360;

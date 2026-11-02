@@ -506,7 +506,6 @@ export function HoleMap(props) {
   const map = projectLooseHoleMap(hole, {
     focus: props.focus,
     height: size.height,
-    here: props.here,
     width: size.width,
     windFromDeg: props.windFromDeg,
   });
