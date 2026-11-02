@@ -548,6 +548,30 @@
                 .udisc-history-score.under { color: var(--under); }
                 .udisc-history-score.even { color: var(--accent); }
                 .udisc-history-score.over { color: var(--team-red); }
+                .udisc-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; margin-top: 0.7rem; }
+                .udisc-stat {
+                    background: var(--bg-primary); border: 1px solid var(--border-color);
+                    border-radius: 12px; padding: 0.65rem 0.75rem;
+                }
+                .udisc-stat b, .udisc-hole-row b {
+                    display: block; font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; font-weight: 400;
+                    letter-spacing: 0.03em; line-height: 1; color: var(--text-primary);
+                }
+                .udisc-stat b.under, .udisc-hole-row b.under { color: var(--under); }
+                .udisc-stat b.even, .udisc-hole-row b.even { color: var(--accent); }
+                .udisc-stat b.over, .udisc-hole-row b.over { color: var(--team-red); }
+                .udisc-mix { margin-top: 0.7rem; color: var(--text-primary); font-weight: 700; font-size: 0.82rem; line-height: 1.45; }
+                .udisc-hole-label {
+                    margin-top: 0.8rem; color: var(--text-muted); font-size: 0.68rem; font-weight: 800;
+                    letter-spacing: 0.05em; text-transform: uppercase;
+                }
+                .udisc-hole-list { display: grid; gap: 0.45rem; margin-top: 0.4rem; }
+                .udisc-hole-row {
+                    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+                    padding: 0.55rem 0.75rem; border: 1px solid var(--border-color); border-radius: 12px;
+                    background: var(--bg-primary);
+                }
+                .udisc-hole-row b { font-size: 1.35rem; }
                 .player-row-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.75rem; }
                 .player-stat {
                     background: var(--bg-secondary); border: 1px solid var(--border-color);
@@ -1154,6 +1178,6 @@
 
     <div id="membersReactDialogsApp"></div>
     <div id="crottsReactApp"></div>
-    <script type="module" src="members-app/members-app.js?v=186"></script>
+    <script type="module" src="members-app/members-app.js?v=187"></script>
 </body>
 </html>

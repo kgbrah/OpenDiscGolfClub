@@ -103,6 +103,95 @@ function HandicapRow({ item }) {
   ]);
 }
 
+function formatUdiscAvg(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return formatToPar(value);
+}
+
+function udiscMix(stats) {
+  const bits = [
+    [stats.aces, "ace"],
+    [stats.eagles, "eagle"],
+    [stats.birdies, "birdie"],
+    [stats.pars, "par"],
+    [stats.bogeys, "bogey"],
+    [stats.doubles, "dbl+"],
+  ];
+  return bits.flatMap(([count, label]) => {
+    const n = Number(count);
+    if (!Number.isFinite(n) || n <= 0) return [];
+    const word = n === 1 || label === "dbl+" ? label : label + "s";
+    return [n + " " + word];
+  }).join(" · ");
+}
+
+function udiscHoleWhere(row) {
+  return [row.courseName, row.layoutName, "Hole " + row.hole].filter(Boolean).join(" · ");
+}
+
+function UdiscHoleLines({ title, rows }) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return null;
+  return h("div", { key: title }, [
+    h("div", { className: "udisc-hole-label", key: "label" }, title),
+    h("div", { className: "udisc-hole-list", key: "list" }, list.map((row) =>
+      h("div", { className: "udisc-hole-row", key: udiscHoleWhere(row) }, [
+        h("div", { key: "where" }, [
+          h("div", { key: "name" }, udiscHoleWhere(row)),
+          h("div", { className: "player-card-meta", key: "n" }, row.rounds + (row.rounds === 1 ? " round" : " rounds")),
+        ]),
+        h("b", { className: relClass(row.avg), key: "avg" }, formatUdiscAvg(row.avg)),
+      ]))),
+  ]);
+}
+
+function UdiscStatTile({ label, value, tone, note }) {
+  return h("div", { className: "udisc-stat" }, [
+    h("div", { className: "player-stat-k", key: "k" }, label),
+    h("b", { className: tone || "", key: "v" }, value),
+    note ? h("div", { className: "player-card-meta", key: "n" }, note) : null,
+  ]);
+}
+
+function UdiscStatsCard({ status, stats }) {
+  const ready = stats && Number(stats.rounds) > 0;
+  const mix = ready ? udiscMix(stats) : "";
+  const partial = ready && stats.partialRounds ? stats.partialRounds + " under 9 holes" : "";
+  const avgNote = ready
+    ? (stats.scoringRounds ? stats.scoringRounds + (stats.scoringRounds === 1 ? " full card" : " full cards") : "Need a 9-hole card")
+    : "";
+  return h("section", { className: "player-card", "data-react-udisc-stats": status }, [
+    h("h3", { key: "title" }, "UDisc stats"),
+    h("p", { className: "player-card-meta", key: "limit" }, "Imported UDisc scorecards only. That file has no UDisc id, so names are the scorecard label, not the account. No putting, fairway, or penalty stats, and no round rating. Cards under 9 holes stay out of the average. This does not change your club handicap."),
+    ready
+      ? h("div", { key: "body" }, [
+        h("div", { className: "udisc-stat-grid", key: "grid" }, [
+          h(UdiscStatTile, { key: "rounds", label: "Rounds", value: String(stats.rounds), note: partial }),
+          h(UdiscStatTile, { key: "courses", label: "Courses", value: String(stats.courses) }),
+          h(UdiscStatTile, {
+            key: "avg",
+            label: "Average",
+            value: formatUdiscAvg(stats.scoringAverage),
+            tone: relClass(stats.scoringAverage),
+            note: avgNote,
+          }),
+          h(UdiscStatTile, {
+            key: "best",
+            label: "Best",
+            value: formatUdiscAvg(stats.bestToPar),
+            tone: relClass(stats.bestToPar),
+            note: stats.bogeyFree ? stats.bogeyFree + " bogey-free" : "",
+          }),
+        ]),
+        mix ? h("p", { className: "udisc-mix", key: "mix" }, mix) : null,
+        h(UdiscHoleLines, { key: "hard", title: "Hardest holes", rows: stats.hardest }),
+        h(UdiscHoleLines, { key: "easy", title: "Easiest holes", rows: stats.easiest }),
+      ])
+      : h("p", { className: "player-card-meta", key: "empty" },
+        status === "loading" ? "Checking imported rounds..." : "Import a scorecard export and the scoring shows up here."),
+  ]);
+}
+
 function udiscImportError(status, code) {
   if (code === "unrecognized_csv") return "That file doesn’t look like a UDisc rounds export. Use You → Rounds → Export to CSV.";
   if (code === "empty") return "No scored rounds were in that file for this player.";
@@ -141,7 +230,7 @@ function UdiscRoundRow({ item, onRemove }) {
 }
 
 function UdiscHistory({ token }) {
-  const [state, setState] = React.useState({ status: "loading", rounds: [] });
+  const [state, setState] = React.useState({ status: "loading", rounds: [], stats: null });
   const [message, setMessage] = React.useState("");
   const [error, setError] = React.useState("");
   const [players, setPlayers] = React.useState([]);
@@ -150,13 +239,17 @@ function UdiscHistory({ token }) {
 
   const load = React.useCallback(() => {
     const controller = new AbortController();
-    setState((prev) => ({ status: "loading", rounds: prev.rounds }));
+    setState((prev) => ({ status: "loading", rounds: prev.rounds, stats: prev.stats }));
     requestJson("/me/udisc-history", { token, signal: controller.signal })
       .then((data) => {
-        setState({ status: "ready", rounds: Array.isArray(data?.rounds) ? data.rounds : [] });
+        setState({
+          status: "ready",
+          rounds: Array.isArray(data?.rounds) ? data.rounds : [],
+          stats: data?.stats && typeof data.stats === "object" ? data.stats : null,
+        });
       })
       .catch((err) => {
-        if (err.name !== "AbortError") setState({ status: "ready", rounds: [] });
+        if (err.name !== "AbortError") setState((prev) => ({ status: "ready", rounds: prev.rounds, stats: prev.stats }));
       });
     return () => controller.abort();
   }, [token]);
@@ -220,7 +313,8 @@ function UdiscHistory({ token }) {
         setError("Couldn’t remove that round.");
         return;
       }
-      setState((prev) => ({ status: "ready", rounds: prev.rounds.filter((row) => row.id !== id) }));
+      setState((prev) => ({ status: "ready", rounds: prev.rounds.filter((row) => row.id !== id), stats: prev.stats }));
+      load();
     } catch {
       setError("Couldn’t remove that round.");
     } finally {
@@ -244,7 +338,7 @@ function UdiscHistory({ token }) {
         setError("Couldn’t remove the imported rounds.");
         return;
       }
-      setState({ status: "ready", rounds: [] });
+      setState({ status: "ready", rounds: [], stats: null });
       setMessage("UDisc history removed.");
     } catch {
       setError("Couldn’t remove the imported rounds.");
@@ -253,7 +347,9 @@ function UdiscHistory({ token }) {
     }
   }
 
-  return h("section", { className: "player-card", "data-react-udisc-history": state.status }, [
+  return h(React.Fragment, null, [
+    h(UdiscStatsCard, { key: "stats", stats: state.stats, status: state.status }),
+    h("section", { className: "player-card", "data-react-udisc-history": state.status, key: "history" }, [
     h("h3", { key: "title" }, "UDisc history"),
     h("p", { className: "player-card-meta", key: "copy" }, "From UDisc, open You, then Rounds, then Export to CSV. Imported rounds stay here and do not change your club handicap."),
     h("label", { className: "player-btn primary udisc-import-btn", key: "import" }, [
@@ -291,6 +387,7 @@ function UdiscHistory({ token }) {
       ])
       : h("p", { className: "player-card-meta", key: "empty" },
         state.status === "loading" ? "Checking imported rounds..." : "No UDisc rounds imported yet."),
+    ]),
   ]);
 }
 

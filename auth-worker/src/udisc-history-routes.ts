@@ -8,6 +8,7 @@ import {
   parseUdiscHistory,
   UDISC_HISTORY_MAX_CSV_CHARS,
 } from "./imports/udisc-history.js";
+import { summarizeUdiscRounds, type UdiscStatHole, type UdiscStatRound } from "./imports/udisc-stats.js";
 
 const IMPORT_BODY_BYTES = 2_000_000;
 const IMPORT_LIMIT = 8;
@@ -41,6 +42,30 @@ function publicRound(row: {
   };
 }
 
+function statRound(row: { course_name: string; layout_name: string; to_par: number | null; holes: string }): UdiscStatRound {
+  let holes: UdiscStatHole[] = [];
+  try {
+    const parsed = JSON.parse(row.holes || "[]");
+    if (Array.isArray(parsed)) {
+      holes = parsed.flatMap((hole) => {
+        const n = Number(hole?.hole);
+        const strokes = Number(hole?.strokes);
+        const par = hole?.par == null || hole.par === "" ? null : Number(hole.par);
+        if (!Number.isInteger(n) || !Number.isInteger(strokes)) return [];
+        return [{ hole: n, strokes, par: par != null && Number.isInteger(par) ? par : null }];
+      });
+    }
+  } catch {
+    holes = [];
+  }
+  return {
+    courseName: row.course_name || "",
+    layoutName: row.layout_name || "",
+    toPar: typeof row.to_par === "number" && Number.isFinite(row.to_par) ? row.to_par : null,
+    holes,
+  };
+}
+
 export async function handleUdiscHistory(
   request: Request,
   env: Env,
@@ -56,7 +81,8 @@ export async function handleUdiscHistory(
     const requested = Number(new URL(request.url).searchParams.get("limit"));
     const limit = Number.isInteger(requested) && requested >= 1 && requested <= 200 ? requested : 50;
     const rows = await db.listUdiscHistory(env.DB, memberId, limit);
-    return json({ rounds: rows.map(publicRound) }, 200, origin);
+    const sources = await db.listUdiscStatSources(env.DB, memberId);
+    return json({ rounds: rows.map(publicRound), stats: summarizeUdiscRounds(sources.map(statRound)) }, 200, origin);
   }
 
   if (method === "DELETE" && id != null) {

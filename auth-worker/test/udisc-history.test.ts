@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import worker from "../src/index.js";
 import { signSession } from "../src/jwt.js";
 import { chooseUdiscPlayer, parseUdiscHistory } from "../src/imports/udisc-history.js";
+import { summarizeUdiscRounds, type UdiscStatRound } from "../src/imports/udisc-stats.js";
 import { jsonObject, arrayField } from "./json.js";
 
 const CSV = [
@@ -72,6 +73,49 @@ describe("parseUdiscHistory", () => {
   });
 });
 
+function nine(over: number[], toPar?: number): UdiscStatRound {
+  const holes = Array.from({ length: 9 }, (_, index) => ({
+    hole: index + 1,
+    par: 3,
+    strokes: 3 + (over[index] || 0),
+  }));
+  return {
+    courseName: "Farmville",
+    layoutName: "Blue",
+    toPar: toPar ?? holes.reduce((sum, hole) => sum + hole.strokes - 3, 0),
+    holes,
+  };
+}
+
+describe("summarizeUdiscRounds", () => {
+  it("averages full cards, counts the mix, and ranks holes with enough rounds", () => {
+    const stats = summarizeUdiscRounds([
+      nine([2, -1]),
+      nine([1, -1]),
+      nine([3, -1]),
+      nine([]),
+      { courseName: "Farmville", layoutName: "Blue", toPar: 1, holes: [{ hole: 1, par: 3, strokes: 1 }] },
+    ]);
+    expect(stats).toMatchObject({
+      rounds: 5,
+      courses: 1,
+      partialRounds: 1,
+      scoringRounds: 4,
+      scoringAverage: 0.8,
+      bestToPar: 0,
+      worstToPar: 2,
+      bogeyFree: 1,
+      aces: 1,
+      birdies: 3,
+      pars: 30,
+      bogeys: 1,
+      doubles: 2,
+    });
+    expect(stats.hardest[0]).toMatchObject({ hole: 1, avg: 0.8, rounds: 5 });
+    expect(stats.easiest[0]).toMatchObject({ hole: 2, avg: -0.8, rounds: 4 });
+  });
+});
+
 const SECRET = "x".repeat(40);
 const members = {
   "member:m_jane": JSON.stringify({ memberId: "m_jane", name: "Jane Doe", udisc: "janedoe", isAdmin: false, pinHash: "x", mustChangePin: false }),
@@ -102,12 +146,23 @@ function memoryDb() {
           return this;
         },
         all: async () => {
+          const memberId = String(binds[0]);
+          const mine = rows.filter((row) => row.member_id === memberId);
+          if (/LIMIT 2000/i.test(sql)) {
+            return {
+              results: mine.map((row) => ({
+                course_name: row.course_name,
+                layout_name: row.layout_name,
+                to_par: row.to_par,
+                holes: row.holes,
+              })),
+              success: true,
+            };
+          }
           if (/FROM udisc_history/i.test(sql)) {
-            const memberId = String(binds[0]);
             const limit = Number(binds[1]);
             return {
-              results: rows
-                .filter((row) => row.member_id === memberId)
+              results: mine
                 .sort((a, b) => b.played_at.localeCompare(a.played_at) || b.id - a.id)
                 .slice(0, limit),
               success: true,
@@ -184,6 +239,7 @@ describe("UDisc history routes", () => {
     const rounds = asRounds(listed);
     expect(rounds).toHaveLength(2);
     expect(rounds[0]).toMatchObject({ courseName: "Other", total: 8, toPar: -1 });
+    expect(listed.stats).toMatchObject({ rounds: 2, courses: 2, partialRounds: 2, scoringRounds: 0, birdies: 1, pars: 3 });
     expect(JSON.stringify(listed)).not.toContain("m_jane");
     expect(JSON.stringify(listed)).not.toContain("roundKey");
     const again = CSV.replace("Jane Doe,Other,Main,2024-04-01 930,,-1,2,3,3", "Jane Doe,Other,Main,2024-04-01 930,20,+2,4,4,4");
@@ -195,7 +251,9 @@ describe("UDisc history routes", () => {
     expect((await call(live, "/me/udisc-history/" + id, "DELETE", token)).status).toBe(200);
     expect((await call(live, "/me/udisc-history/999", "DELETE", token)).status).toBe(404);
     expect((await call(live, "/me/udisc-history", "DELETE", token)).status).toBe(200);
-    expect(asRounds(await jsonObject(await call(live, "/me/udisc-history", "GET", token)))).toHaveLength(0);
+    const cleared = await jsonObject(await call(live, "/me/udisc-history", "GET", token));
+    expect(asRounds(cleared)).toHaveLength(0);
+    expect(cleared.stats).toMatchObject({ rounds: 0, courses: 0 });
   });
 
   it("asks which player when the profile matches neither name", async () => {

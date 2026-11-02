@@ -72,3 +72,25 @@ export async function deleteUdiscHistory(db: D1Like, memberId: string, id: numbe
 export async function clearUdiscHistory(db: D1Like, memberId: string): Promise<void> {
   await db.prepare("DELETE FROM udisc_history WHERE member_id = ?").bind(memberId).run();
 }
+
+export interface UdiscStatSourceRow {
+  course_name: string;
+  layout_name: string;
+  to_par: number | null;
+  holes: string;
+}
+
+export async function listUdiscStatSources(db: D1Like, memberId: string): Promise<UdiscStatSourceRow[]> {
+  const rows = (
+    await db
+      .prepare(
+        `SELECT course_name, layout_name, to_par, holes
+           FROM udisc_history
+          WHERE member_id = ?
+          LIMIT 2000`,
+      )
+      .bind(memberId)
+      .all<UdiscStatSourceRow>()
+  ).results;
+  return Array.isArray(rows) ? rows : [];
+}

@@ -73,8 +73,12 @@ test("Play tab imports UDisc history without feeding the club handicap", () => {
   assert.equal(formatUdiscWhen("2024-03-15T10:14:00"), "Fri, Mar 15, 2024 · 10:14 AM");
   assert.equal(formatUdiscWhen("2024-03-15T00:00:00"), "Fri, Mar 15, 2024");
   assert.match(playPage, /data-react-udisc-history/);
+  assert.match(playPage, /data-react-udisc-stats/);
+  assert.match(playPage, /no UDisc id/);
+  assert.match(playPage, /No putting, fairway, or penalty stats/);
   assert.match(playPage, /\/me\/udisc-history/);
   assert.match(playPage, /do not change your club handicap/);
   assert.match(playPage, /Export to CSV/);
   assert.match(html, /\.udisc-history-row/);
+  assert.match(html, /\.udisc-stat-grid/);
 });
