@@ -59,7 +59,7 @@ test('live scoring links back to the members dashboard', () => {
   const html = readFileSync('score.html', 'utf8');
   const shellSource = readFileSync('src/score-app/main.js', 'utf8');
   const authSource = readFileSync('src/score-app/auth-flow.js', 'utf8');
-  assert.match(html, /<script type="module" src="score-app\/score-app\.js\?v=202"><\/script>/);
+  assert.match(html, /<script type="module" src="score-app\/score-app\.js\?v=203"><\/script>/);
   assert.match(shellSource, /href: "gvdg-members\.html"/);
   assert.match(shellSource, /"aria-label": "Return to members"/);
   assert.match(authSource, /Return to members/);
@@ -106,6 +106,7 @@ test('shared service worker caches app install assets and member fallback', () =
   assert.match(pwa, /beforeinstallprompt/);
   assert.match(pwa, /gvdg:pwa-install-available/);
   assert.match(pwa, /gvdg:pwa-install-prompt/);
+  assert.match(pwa, /gvdg:pwa-install-manual/);
   assert.match(pwa, /updateViaCache/);
   assert.match(pwa, /SKIP_WAITING/);
   assert.match(pwa, /pwa-update/);

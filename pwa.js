@@ -17,10 +17,21 @@
   });
 
   window.addEventListener('gvdg:pwa-install-prompt', function () {
-    if (!deferredInstall || typeof deferredInstall.prompt !== 'function') return;
-    deferredInstall.prompt();
+    if (!deferredInstall || typeof deferredInstall.prompt !== 'function') {
+      window.dispatchEvent(new CustomEvent('gvdg:pwa-install-manual'));
+      return;
+    }
+    var pending = deferredInstall;
     deferredInstall = null;
     window.__gvdgPwaInstallAvailable = false;
+    pending.prompt();
+    if (pending.userChoice && typeof pending.userChoice.then === 'function') {
+      pending.userChoice.then(function (choice) {
+        if (choice && choice.outcome === 'accepted') {
+          window.dispatchEvent(new CustomEvent('gvdg:pwa-installed'));
+        }
+      }).catch(function () {});
+    }
   });
 
   function standaloneDisplay() {

@@ -19,16 +19,24 @@ export function InstallCoachBanner() {
     const standalone = isStandaloneDisplay(matchesMedia, typeof navigator !== "undefined" ? navigator.standalone : false);
     const dismissed = readInstallCoachDismissed(typeof localStorage !== "undefined" ? localStorage : null);
     const mode = dismissed || standalone ? "hidden" : installCoachMode(undefined, standalone);
-    return { mode, promptReady: false };
+    return { hint: false, mode };
   });
 
   React.useEffect(() => {
-    function onAvailable() {
-      setState((current) => current.mode === "hidden" ? current : { ...current, promptReady: true });
+    function onManual() {
+      setState((current) => current.mode === "hidden" ? current : { ...current, hint: true });
     }
-    window.addEventListener("gvdg:pwa-install-available", onAvailable);
-    if (window.__gvdgPwaInstallAvailable) onAvailable();
-    return () => window.removeEventListener("gvdg:pwa-install-available", onAvailable);
+    function onInstalled() {
+      setState({ hint: false, mode: "hidden" });
+    }
+    window.addEventListener("gvdg:pwa-install-manual", onManual);
+    window.addEventListener("gvdg:pwa-installed", onInstalled);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("gvdg:pwa-install-manual", onManual);
+      window.removeEventListener("gvdg:pwa-installed", onInstalled);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -41,11 +49,10 @@ export function InstallCoachBanner() {
 
   if (state.mode === "hidden") return null;
   const copy = installCoachCopy(state.mode);
-  const canInstall = state.mode === "prompt" && state.promptReady;
 
   function dismiss() {
     writeInstallCoachDismissed(localStorage);
-    setState({ mode: "hidden", promptReady: false });
+    setState({ hint: false, mode: "hidden" });
   }
 
   function install() {
@@ -58,10 +65,13 @@ export function InstallCoachBanner() {
       h("p", { key: "body" }, copy.body),
     ]),
     h("div", { className: "install-coach-actions", key: "actions" }, [
-      canInstall
+      state.mode === "prompt"
         ? h("button", { className: "install-coach-btn", key: "install", type: "button", onClick: install }, copy.action)
         : null,
       h("button", { className: "install-coach-dismiss", key: "dismiss", type: "button", onClick: dismiss }, "Not now"),
     ].filter(Boolean)),
+    state.hint
+      ? h("p", { className: "install-coach-hint", key: "hint" }, "If the install window doesn't open, use the browser menu and choose Install app.")
+      : null,
   ]);
 }
