@@ -101,7 +101,17 @@ export function MemberAuthGate() {
   return h("div", { className: "login-card", "data-react-auth-gate": mode }, [
     h(AuthIcon, { key: "icon" }),
     h("h1", { className: "login-title", key: "title" }, mode === "apply" ? "Join the Club" : "Members Only"),
-    mode === "apply" ? null : h("p", { className: "login-subtitle", key: "subtitle" }, "Log in with your PDGA # or UDisc username and your PIN."),
+    mode === "login"
+      ? h("p", { className: "login-subtitle", key: "subtitle" }, "Anyone can start a round. Club members can sign in below.")
+      : mode === "apply"
+        ? null
+        : h("p", { className: "login-subtitle", key: "subtitle" }, "Log in with your PDGA # or UDisc username and your PIN."),
+    mode === "login"
+      ? h("a", { className: "login-btn login-play", href: "score.html", key: "play" }, "Start a round")
+      : null,
+    mode === "login"
+      ? h("p", { className: "login-subtitle", key: "play-note" }, "No club account. Pick a course and share the code.")
+      : null,
     h(LoginForm, { active: mode === "login", supportsPasskeys, state: formStates.login, onValuesChange: setFormValues, key: "login" }),
     h(ApplyForm, { active: mode === "apply", state: formStates.apply, onValuesChange: setFormValues, key: "apply" }),
     h(PinChangeForm, { active: mode === "pin", state: formStates.pin, onValuesChange: setFormValues, key: "pin" }),

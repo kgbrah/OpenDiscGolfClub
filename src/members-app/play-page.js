@@ -435,8 +435,7 @@ function PlayHistory({ token }) {
 
 export function MemberPlayPage() {
   const token = storageGet(TOKEN_KEY);
-  if (!token) return null;
-  return h("div", { className: "react-play-page player-play", "data-react-play-page": "ready" }, [
+  return h("div", { className: "react-play-page player-play", "data-react-play-page": token ? "ready" : "guest" }, [
     h("a", {
       className: "player-keep-score",
       href: "score.html",
@@ -444,13 +443,13 @@ export function MemberPlayPage() {
     }, [
       h("div", { key: "copy" }, [
         h("h2", { key: "title" }, "Start a round"),
-        h("p", { key: "meta" }, "Casual card. Share the code — friends don’t need a club login."),
+        h("p", { key: "meta" }, "Casual card. No club login. Share the code with the card."),
       ]),
       h("span", { className: "player-keep-score-go", key: "go" }, "Start"),
     ]),
-    h(LiveScoringPanel, { token, variant: "play", key: "live" }),
-    h(PlayHistory, { token, key: "history" }),
-    h(UdiscHistory, { token, key: "udisc" }),
+    token ? h(LiveScoringPanel, { token, variant: "play", key: "live" }) : null,
+    token ? h(PlayHistory, { token, key: "history" }) : null,
+    token ? h(UdiscHistory, { token, key: "udisc" }) : null,
     h(PlayJoinCard, { key: "join" }),
   ]);
 }

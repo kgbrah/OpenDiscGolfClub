@@ -800,7 +800,7 @@ export function startScoreApp(options) {
         async function startOpenPlay(name, after) {
             const r = await api('/rounds/open-play', { method: 'POST', auth: false, guest: false, body: { name: name } });
             if (!r.ok || !r.data || !r.data.token) {
-                return { ok: false, message: r.status === 429 ? 'Too many tries — wait a minute and try again.' : 'Could not start without an account. Try again.' };
+                return { ok: false, message: r.status === 429 ? 'Too many tries — wait a minute and try again.' : 'Could not start a guest card. Check the connection and try again.' };
             }
             writeOpenPlaySession({ token: r.data.token, name: r.data.name || name });
             if (typeof after === 'function') after();
@@ -1208,7 +1208,7 @@ export function startScoreApp(options) {
                 onCreate: function (selected) { createRound(course, layout, selected); }
             });
         }
-        async function createRound(course, layout, config) {
+        async function createRound(course, layout, config, retry) {
             const liveScoringConfig = config || defaultLiveScoringConfig();
             const requested = cleanRoundCode(liveScoringConfig.code);
             if (String(liveScoringConfig.code || '').trim() && (requested.length < 4 || requested.length > 12)) {
@@ -1224,7 +1224,17 @@ export function startScoreApp(options) {
                 location.search = '?round=' + r.data.code;
                 return;
             }
-            if (r.status === 401) { renderOpenPlay(function () { createRound(course, layout, liveScoringConfig); }); return; }
+            if (r.status === 401) {
+                if (!retry && memberToken()) {
+                    clearMemberSession();
+                    notifyScoreAuthChanged();
+                    if (readOpenPlayToken()) return createRound(course, layout, liveScoringConfig, true);
+                }
+                if (!retry) {
+                    renderOpenPlay(function () { createRound(course, layout, liveScoringConfig, true); });
+                    return;
+                }
+            }
             if (r.data && r.data.error === 'code_taken') { renderSetupPick(course, layout, 'That code is already in use. Pick another.'); return; }
             if (r.data && r.data.error === 'invalid_code') { renderSetupPick(course, layout, 'Use 4–12 letters or numbers.'); return; }
             renderMessage('Could not start round', (r.data && r.data.error === 'no_layout_holes') ? 'That layout has no holes/pars yet.' : 'Please try again.', false);
