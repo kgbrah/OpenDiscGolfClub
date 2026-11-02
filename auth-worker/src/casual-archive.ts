@@ -187,5 +187,6 @@ export function publicMemberCasualResult(row: Record<string, unknown>) {
     udisc_course_id: row.udisc_course_id ?? null,
     scorecard: row.scorecard ?? null,
     breakdown: row.breakdown ?? null,
+    stroke: row.stroke_singles == null ? true : Number(row.stroke_singles) === 1,
   };
 }

@@ -153,7 +153,14 @@ export async function listMemberCasualResults(db: D1Like, memberId: string, opts
   const offset = typeof rawOffset === "number" && Number.isInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
   let sql =
     `SELECT cr.*, r.round_code, r.course_name, r.layout_name, r.layout_id, r.finalized_at, r.holes AS round_holes,
-                c.udisc_course_id AS udisc_course_id
+                c.udisc_course_id AS udisc_course_id,
+                CASE
+                  WHEN cr.match_result IS NOT NULL AND TRIM(cr.match_result) != '' AND cr.match_result != 'null' THEN 0
+                  WHEN json_extract(r.scoring_config, '$.scoringStyle') = 'matchplay' THEN 0
+                  WHEN json_extract(cr.scoring_group, '$.targetType') = 'pair' THEN 0
+                  WHEN json_extract(r.scoring_config, '$.groupFormat') = 'doubles' THEN 0
+                  ELSE 1
+                END AS stroke_singles
          FROM casual_results cr JOIN casual_rounds r ON r.id = cr.casual_round_id
          LEFT JOIN courses c ON c.id = r.course_id
          WHERE cr.member_id = ?
@@ -228,4 +235,46 @@ export async function listSeasonPlayRows(db: D1Like, year: number) {
       .all()
   ).results;
   return [...(Array.isArray(events) ? events : []), ...(Array.isArray(casual) ? casual : [])];
+}
+
+export async function listLayoutHandicapRounds(db: D1Like, layoutId: number, cutoffDate: string) {
+  return (
+    await db
+      .prepare(
+        `SELECT member_id, name, to_par, played_at FROM (
+           SELECT cr.member_id AS member_id, cr.name AS name, cr.to_par AS to_par,
+                  COALESCE(r.finalized_at, cr.created_at) AS played_at
+           FROM casual_results cr
+           JOIN casual_rounds r ON r.id = cr.casual_round_id
+           WHERE r.layout_id = ?
+             AND cr.member_id IS NOT NULL
+             AND cr.member_id NOT LIKE 'g_%'
+             AND cr.member_id NOT LIKE 'op_%'
+             AND cr.place IS NOT NULL
+             AND cr.to_par IS NOT NULL
+             AND (cr.match_result IS NULL OR TRIM(cr.match_result) = '' OR cr.match_result = 'null')
+             AND (json_extract(r.scoring_config, '$.scoringStyle') IS NULL OR json_extract(r.scoring_config, '$.scoringStyle') != 'matchplay')
+             AND (json_extract(r.scoring_config, '$.groupFormat') IS NULL OR json_extract(r.scoring_config, '$.groupFormat') != 'doubles')
+             AND (json_extract(cr.scoring_group, '$.targetType') IS NULL OR json_extract(cr.scoring_group, '$.targetType') != 'pair')
+             AND COALESCE(r.finalized_at, cr.created_at) >= ?
+           UNION ALL
+           SELECT res.member_id AS member_id, res.name AS name, res.to_par AS to_par,
+                  COALESCE(e.date, res.created_at) AS played_at
+           FROM results res
+           JOIN events e ON e.id = res.event_id
+           WHERE e.layout_id = ?
+             AND res.member_id IS NOT NULL
+             AND res.member_id NOT LIKE 'g_%'
+             AND res.member_id NOT LIKE 'op_%'
+             AND res.place IS NOT NULL
+             AND res.to_par IS NOT NULL
+             AND (res.match_result IS NULL OR TRIM(res.match_result) = '' OR res.match_result = 'null')
+             AND (e.format IS NULL OR e.format = '' OR (e.format != 'matchplay' AND e.format != 'doubles'))
+             AND (json_extract(res.scoring_group, '$.targetType') IS NULL OR json_extract(res.scoring_group, '$.targetType') != 'pair')
+             AND COALESCE(e.date, res.created_at) >= ?
+         )`,
+      )
+      .bind(layoutId, cutoffDate, layoutId, cutoffDate)
+      .all()
+  ).results;
 }

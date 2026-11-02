@@ -5,6 +5,7 @@ import { LiveScoringPanel } from "./activity-panels.js";
 import { formatEventDay, formatToPar } from "./format.js";
 import { liveScoreHref, liveWatchHref } from "../shared/live-watch.js";
 import { recentPlayRounds, relClass } from "./play-page-model.js";
+import { myLayoutHandicaps } from "../shared/handicap.js";
 
 const h = React.createElement;
 
@@ -89,33 +90,57 @@ function RecentRoundCard({ item }) {
   ]);
 }
 
-function RecentRoundsPanel({ token }) {
-  const [state, setState] = React.useState({ status: token ? "loading" : "idle", items: [] });
+function HandicapRow({ item }) {
+  const where = [item.course, item.layout].filter(Boolean).join(" · ");
+  const detail = item.rounds + (item.rounds === 1 ? " round" : " rounds") + (item.provisional ? " · provisional" : "");
+  return h("div", { className: "handicap-row" }, [
+    h("div", { key: "copy" }, [
+      h("div", { className: "handicap-where", key: "where" }, where),
+      h("div", { className: "player-card-meta", key: "detail" }, detail),
+    ]),
+    h("b", { className: relClass(item.start), key: "start" }, formatToPar(item.start)),
+  ]);
+}
+
+function PlayHistory({ token }) {
+  const [state, setState] = React.useState({ status: token ? "loading" : "idle", items: [], handicaps: [] });
 
   React.useEffect(() => {
     if (!token) {
-      setState({ status: "idle", items: [] });
+      setState({ status: "idle", items: [], handicaps: [] });
       return undefined;
     }
     const controller = new AbortController();
-    setState({ status: "loading", items: [] });
+    setState({ status: "loading", items: [], handicaps: [] });
     requestJson("/my-results", { token, signal: controller.signal })
       .then((data) => {
-        setState({ status: "ready", items: recentPlayRounds(data?.casual) });
+        const casual = data?.casual;
+        setState({ status: "ready", items: recentPlayRounds(casual), handicaps: myLayoutHandicaps(casual) });
       })
       .catch((error) => {
-        if (error.name !== "AbortError") setState({ status: "ready", items: [] });
+        if (error.name !== "AbortError") setState({ status: "ready", items: [], handicaps: [] });
       });
     return () => controller.abort();
   }, [token]);
 
-  return h("section", { className: "player-card", "data-react-play-recent": state.status }, [
-    h("h3", { key: "title" }, "Recent rounds"),
-    state.items.length
-      ? h("div", { className: "live-round-list", key: "list" }, state.items.map((item) =>
-        h(RecentRoundCard, { item, key: item.code })))
-      : h("p", { className: "player-card-meta", key: "empty" },
-        state.status === "loading" ? "Looking up finished cards..." : "Finish a card and it lands here."),
+  return h(React.Fragment, null, [
+    h("section", { className: "player-card", "data-react-play-handicap": state.status, key: "handicap" }, [
+      h("h3", { key: "title" }, "Club handicap"),
+      h("p", { className: "player-card-meta", key: "copy" }, "Starting score so an average round on that layout lands near even. Last 1–5 finished stroke rounds there, past year. A thin record counts less until you have three."),
+      state.handicaps.length
+        ? h("div", { className: "handicap-list", key: "list" }, state.handicaps.map((item) =>
+          h(HandicapRow, { item, key: item.layoutId })))
+        : h("p", { className: "player-card-meta", key: "empty" },
+          state.status === "loading" ? "Checking finished rounds..." : "Finish a stroke round and your start shows up here."),
+    ]),
+    h("section", { className: "player-card", "data-react-play-recent": state.status, key: "recent" }, [
+      h("h3", { key: "title" }, "Recent rounds"),
+      state.items.length
+        ? h("div", { className: "live-round-list", key: "list" }, state.items.map((item) =>
+          h(RecentRoundCard, { item, key: item.code })))
+        : h("p", { className: "player-card-meta", key: "empty" },
+          state.status === "loading" ? "Looking up finished cards..." : "Finish a card and it lands here."),
+    ]),
   ]);
 }
 
@@ -135,7 +160,7 @@ export function MemberPlayPage() {
       h("span", { className: "player-keep-score-go", key: "go" }, "Start"),
     ]),
     h(LiveScoringPanel, { token, variant: "play", key: "live" }),
-    h(RecentRoundsPanel, { token, key: "recent" }),
+    h(PlayHistory, { token, key: "history" }),
     h(PlayJoinCard, { key: "join" }),
   ]);
 }

@@ -4,8 +4,28 @@ import { publicPlayerLocations, type LivePlayerLocation } from "./live-locations
 import type { PlayerState } from "./scoring.js";
 import { attestationForCard, canEnterScorecard, computeRoundStandings, healthyTargets, isCardLocked, publicScoreTargets, resolvedHoles, scorecardIssues, scoringState } from "./live-state.js";
 import type { LiveMeta } from "./live-types.js";
+import type { LiveStanding } from "./live-scoring.js";
+import { handicapKey } from "./handicap.js";
 
 const EMPTY_LOCATIONS: ReadonlyMap<number, LivePlayerLocation> = new Map();
+
+function standingView(standing: LiveStanding) {
+  return {
+    name: standing.name,
+    division: standing.division,
+    thru: standing.thru,
+    total: standing.total,
+    toPar: standing.toPar,
+    targetId: standing.targetId,
+    targetType: standing.targetType,
+    playerIndexes: standing.playerIndexes,
+    members: standing.members,
+    scorecard: standing.scorecard,
+    scoringGroup: standing.scoringGroup ?? null,
+    match: standing.match ?? null,
+    handicapKeys: (standing.memberIds || []).map((id) => handicapKey(id)),
+  };
+}
 
 export function publicPlayerThrows(
   raw: PlayerState["throws"] | null | undefined,
@@ -51,20 +71,7 @@ export function publicSnapshot(
   const issues = scorecardIssues(meta, players, holes, scoring);
   const standings = scoring.globalError
     ? []
-    : computeRoundStandings({ holes, players, config: scoring.config, targets: healthyTargets(scoring) }).map((standing) => ({
-        name: standing.name,
-        division: standing.division,
-        thru: standing.thru,
-        total: standing.total,
-        toPar: standing.toPar,
-        targetId: standing.targetId,
-        targetType: standing.targetType,
-        playerIndexes: standing.playerIndexes,
-        members: standing.members,
-        scorecard: standing.scorecard,
-        scoringGroup: standing.scoringGroup ?? null,
-        match: standing.match ?? null,
-      }));
+    : computeRoundStandings({ holes, players, config: scoring.config, targets: healthyTargets(scoring) }).map(standingView);
   return {
     status: meta?.status ?? "none",
     rev: meta?.rev ?? 0,
@@ -126,20 +133,7 @@ export function mineData(
   const scoring = scoringState(meta, players);
   const standings = scoring.globalError
     ? []
-    : computeRoundStandings({ holes, players, config: scoring.config, targets: healthyTargets(scoring) }).map((standing) => ({
-        name: standing.name,
-        division: standing.division,
-        thru: standing.thru,
-        total: standing.total,
-        toPar: standing.toPar,
-        targetId: standing.targetId,
-        targetType: standing.targetType,
-        playerIndexes: standing.playerIndexes,
-        members: standing.members,
-        scorecard: standing.scorecard,
-        scoringGroup: standing.scoringGroup ?? null,
-        match: standing.match ?? null,
-      }));
+    : computeRoundStandings({ holes, players, config: scoring.config, targets: healthyTargets(scoring) }).map(standingView);
   const meRaw = authMember ? players.findIndex((player) => player.memberId === authMember) : -1;
   const foundPlayer = meRaw >= 0 ? players[meRaw] : undefined;
   const meIdx = foundPlayer && !foundPlayer.removed ? meRaw : -1;

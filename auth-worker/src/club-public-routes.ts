@@ -11,6 +11,7 @@ import { publicFieldsByEvent } from "./event-field.js";
 import { COURSE_CATALOG_CACHE_NAME, courseCatalogCacheKey } from "./course-catalog-cache.js";
 import { getUdiscImportState } from "./db-udisc-layout-imports.js";
 import { listNearbyPdgaEvents, PDGA_EVENT_MILES } from "./pdga-events.js";
+import { handicapCutoffDate, handicapsFromRounds, type HandicapRound } from "./handicap.js";
 
 const CATALOG_CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -189,6 +190,22 @@ export async function handleClubPublic(
     const aceFee = cfg?.ace_fee_cents || 0;
     const carryIn = Number(pot?.carryover_in_cents || 0);
     return json({ ace_pot: { ...(pot || {}), contributors, ace_fee_cents: aceFee, total_cents: carryIn + contributors * aceFee } }, 200, origin);
+  }
+  if (method === "GET" && seg[0] === "layouts" && seg.length === 3 && seg[2] === "handicaps") {
+    const lid = asInt(seg[1]);
+    if (lid == null) return json({ error: "not_found" }, 404, origin);
+    const rounds = await readD1OrFallback(
+      () => db.listLayoutHandicapRounds(env.DB, lid, handicapCutoffDate()),
+      () => [],
+    );
+    const players = handicapsFromRounds((Array.isArray(rounds) ? rounds : []) as HandicapRound[]).map((player) => ({
+      key: player.key,
+      name: player.name,
+      start: player.start,
+      rounds: player.rounds,
+      provisional: player.provisional,
+    }));
+    return json({ layoutId: lid, players, windowDays: 365, maxRounds: 5 }, 200, origin, { "Cache-Control": "private, max-age=60" });
   }
   if (method === "GET" && seg[0] === "courses" && seg.length === 3 && (seg[2] === "layouts" || seg[2] === "positions")) {
     const cid = asInt(seg[1]);

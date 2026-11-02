@@ -59,6 +59,9 @@ test("Play tab mounts a recent-rounds panel that watches finished cards", () => 
   assert.match(playPage, /Replay/);
   assert.match(playPage, /\/my-results/);
   assert.match(playPage, /recentPlayRounds/);
+  assert.match(playPage, /Club handicap/);
+  assert.match(playPage, /myLayoutHandicaps/);
+  assert.match(playPage, /data-react-play-handicap/);
   assert.match(html, /\.recent-round-score/);
   assert.match(html, /\.recent-round-score\.even, \.season-result-par\.even \{ color: var\(--accent\)/);
   assert.match(html, /\.recent-round-score\.over, \.season-result-par\.over \{ color: var\(--team-red\)/);

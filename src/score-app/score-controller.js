@@ -21,6 +21,7 @@ import {
     udiscExportData,
 } from "./score-view-model.js";
 import { layoutHoles, matchCourseByName, rememberLastCourse, sortLayoutsForPick } from "./course-pick.js";
+import { decorateStandings } from "../shared/handicap.js";
 import { resolveApiBase } from "../shared/api-base.js";
 import { clearMemberSession, readMemberToken, writeMemberSession } from "../shared/member-session.js";
 import { createWakeLock } from "../shared/wake-lock.js";
@@ -63,7 +64,7 @@ export function startScoreApp(options) {
         const scoreBody = options && options.body;
         const scoreShell = options && options.shell;
         const POTS_REFRESH_MS = 30 * 1000;
-        const S = { holes: [], cardId: null, myIndex: null, scorerIndex: null, cardmates: [], snap: null, holeIdx: 0, ws: null, wsTimer: null, status: null, conflicts: [], missing: [], courseName: null, layoutName: null, lastRev: -1, udiscCourseId: null, roundConfig: null, scoreTargets: [], scoreTargetError: null, weather: null, pots: null, playerLocations: [], cardLocked: false, cardAttestation: { agreedIndexes: [], neededIndexes: [], complete: false }, finishConfirmOpen: false };
+        const S = { holes: [], cardId: null, myIndex: null, scorerIndex: null, cardmates: [], snap: null, holeIdx: 0, ws: null, wsTimer: null, status: null, conflicts: [], missing: [], courseName: null, layoutName: null, lastRev: -1, udiscCourseId: null, roundConfig: null, scoreTargets: [], scoreTargetError: null, weather: null, pots: null, playerLocations: [], cardLocked: false, cardAttestation: { agreedIndexes: [], neededIndexes: [], complete: false }, finishConfirmOpen: false, handicaps: null, handicapLayoutId: null, handicapLoading: false, handicapTicket: 0 };
         let potsTimer = null;
         let locWatchId = null;
         let locRetryTimer = null;
@@ -465,6 +466,8 @@ export function startScoreApp(options) {
         }
         function mergeFromSnap() {
             const snap = S.snap; if (!snap || !Array.isArray(snap.players)) return;
+            if (snap.roundConfig) S.roundConfig = snap.roundConfig;
+            ensureHandicaps(snap.layoutId || S.layoutId);
             if (WATCH) {
                 const extrasChanged = applyLiveExtras(snap);
                 if (snap.status === 'final') stopLiveLocation();
@@ -774,6 +777,39 @@ export function startScoreApp(options) {
         function openLeaderboard() { lbOpen = true; renderLeaderboard(); }
         if (scoreShell && typeof scoreShell.setLeaderboardHandler === 'function') scoreShell.setLeaderboardHandler(openLeaderboard);
         function closeLeaderboard() { lbOpen = false; leaderboardSheet.close(); }
+        function boardStandings(rows) {
+            if (isMatchplayScoring(S)) return Array.isArray(rows) ? rows : [];
+            return decorateStandings(rows, S.handicaps);
+        }
+        function ensureHandicaps(layoutId) {
+            if (isMatchplayScoring(S)) {
+                S.handicaps = null;
+                S.handicapLayoutId = null;
+                S.handicapLoading = false;
+                return;
+            }
+            const id = Number(layoutId);
+            if (!Number.isInteger(id) || id <= 0) return;
+            if (S.handicapLayoutId === id && (S.handicaps || S.handicapLoading)) return;
+            const ticket = S.handicapTicket + 1;
+            S.handicapTicket = ticket;
+            S.handicapLayoutId = id;
+            S.handicapLoading = true;
+            S.handicaps = null;
+            api('/layouts/' + id + '/handicaps', { auth: false, guest: false }).then(function (r) {
+                if (S.handicapTicket !== ticket) return;
+                const map = Object.create(null);
+                const players = r.ok && r.data && Array.isArray(r.data.players) ? r.data.players : [];
+                players.forEach(function (row) {
+                    if (!row || !row.key || !Number.isFinite(Number(row.start))) return;
+                    map[row.key] = { start: Number(row.start), rounds: Number(row.rounds) || 0, provisional: row.provisional === true };
+                });
+                S.handicaps = map;
+                S.handicapLoading = false;
+                if (lbOpen) renderLeaderboard();
+                if (WATCH) renderWatch();
+            });
+        }
         function renderLeaderboard() {
             const blockers = finalizeBlockers(S);
             blockers.hint = finishRoundHint(blockers, MODE, S.cardLocked || S.status === 'final');
@@ -788,7 +824,7 @@ export function startScoreApp(options) {
                 onFinalize: openFinishConfirm,
                 relClass: relClass,
                 relText: relText,
-                standings: (S.snap && S.snap.standings) || [],
+                standings: boardStandings((S.snap && S.snap.standings) || []),
                 status: S.status,
                 onHole: function (holeNumber) {
                     const index = (S.holes || []).findIndex(function (hole) { return hole && hole.hole === holeNumber; });
@@ -883,6 +919,7 @@ export function startScoreApp(options) {
             S.roundConfig = d.roundConfig || null; S.scoreTargets = Array.isArray(d.scoreTargets) ? d.scoreTargets : []; S.scoreTargetError = d.scoreTargetError || null;
             S.courseName = d.courseName || null; S.layoutName = d.layoutName || null; S.udiscCourseId = d.udiscCourseId || null;
             S.layoutId = d.layoutId || null;
+            if (!offline) ensureHandicaps(S.layoutId);
             S.weather = d.weather || null;
             S.playerLocations = Array.isArray(d.playerLocations) ? d.playerLocations : [];
             S.scorerIndex = d.playerIndex;
@@ -1248,7 +1285,7 @@ export function startScoreApp(options) {
                 relText: relText,
                 showPots: pots.visible,
                 showWeather: Boolean(S.weather),
-                standings: Array.isArray(snap.standings) ? snap.standings : [],
+                standings: boardStandings(Array.isArray(snap.standings) ? snap.standings : []),
                 status: S.status,
                 udiscCourseId: S.udiscCourseId || '',
                 weather: S.weather,
@@ -1278,6 +1315,7 @@ export function startScoreApp(options) {
             S.layoutName = d.layoutName || null;
             S.udiscCourseId = d.udiscCourseId || null;
             S.layoutId = d.layoutId || null;
+            ensureHandicaps(S.layoutId);
             S.weather = d.weather || null;
             S.playerLocations = Array.isArray(d.playerLocations) ? d.playerLocations : [];
             S.lastRev = d.rev == null ? -1 : d.rev;

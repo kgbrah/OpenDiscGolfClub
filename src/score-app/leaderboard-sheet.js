@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { displayMatchStatus } from "../shared/match-status.js";
 import { UDiscExportDetails } from "../shared/udisc-export.js";
 import { useAccessibleDialog } from "../shared/a11y.js";
-import { strokeLabel } from "./score-view-model.js";
+import { relText as formatStart, strokeLabel } from "./score-view-model.js";
 
 const h = React.createElement;
 
@@ -20,6 +20,34 @@ function standingName(standing) {
 
 function standingKey(standing, index) {
   return String(standing.targetId || standing.name || index);
+}
+
+function handicapOn(standings) {
+  return standings.some((standing) => standing && standing.handicapStart != null);
+}
+
+function startLine(standing) {
+  if (standing.handicapStart == null) return null;
+  return h("span", { className: "lb-start", key: "start" },
+    "Start " + formatStart(standing.handicapStart) + (standing.provisional ? " · provisional" : ""));
+}
+
+function resultCell(standing, isMatchplay, handicapped, relClass, relText) {
+  if (isMatchplay) return h("td", { key: "match" }, displayMatchStatus(standing.match));
+  if (!handicapped) {
+    return h("td", { className: "tp " + relClass(standing.toPar || 0), key: "toPar" }, standing.thru ? relText(standing.toPar || 0) : "E");
+  }
+  if (standing.handicapStart == null) {
+    return h("td", { className: "tp " + relClass(standing.toPar || 0), key: "toPar" }, [
+      h("b", { key: "gross" }, standing.thru ? relText(standing.toPar || 0) : "E"),
+      h("span", { className: "lb-rnd", key: "note" }, "No start"),
+    ]);
+  }
+  const net = Number(standing.net) || 0;
+  return h("td", { className: "tp " + relClass(net), key: "toPar" }, [
+    h("b", { key: "net" }, relText(net)),
+    h("span", { className: "lb-rnd", key: "rnd" }, "Rnd " + (standing.thru ? relText(standing.toPar || 0) : "E")),
+  ]);
 }
 
 function StandingScorecard({ onHole, scorecard, standing }) {
@@ -63,8 +91,13 @@ export function LeaderboardTable({ isDoubles, isMatchplay, onHole, relClass, rel
     });
   }
   if (!standings.length) return h("p", { className: "muted" }, "No scores in yet.");
-  const resultHead = isMatchplay ? "Match" : "To par";
-  return h("table", { className: "lb" }, [
+  const handicapped = !isMatchplay && handicapOn(standings);
+  const resultHead = isMatchplay ? "Match" : handicapped ? "Net" : "To par";
+  return h("div", { className: "lb-wrap" }, [
+    handicapped
+      ? h("p", { className: "muted lb-handicap-note", key: "note" }, "Club handicap. Net is your start plus this round.")
+      : null,
+    h("table", { className: "lb", key: "table" }, [
     h("thead", { key: "head" }, h("tr", null, [
       h("th", { key: "rank" }, ""),
       h("th", { key: "name" }, isDoubles ? "Pair" : "Player"),
@@ -75,26 +108,27 @@ export function LeaderboardTable({ isDoubles, isMatchplay, onHole, relClass, rel
       const id = standingKey(standing, index);
       const hasCard = Array.isArray(standing.scorecard) && standing.scorecard.length > 0;
       const open = isOpen(id, hasCard);
+      const label = hasCard
+        ? h("button", {
+          "aria-expanded": open ? "true" : "false",
+          "aria-controls": "lb-card-" + id,
+          className: "lb-name-btn",
+          key: "label",
+          type: "button",
+          onClick: () => toggle(id),
+        }, standingName(standing))
+        : h("span", { className: "lb-name-text", key: "label" }, standingName(standing));
       return h(React.Fragment, { key: id }, [
         h("tr", { key: "row" }, [
           h("td", { className: "pos", key: "pos" }, String(index + 1)),
-          h("td", { className: "name", key: "name" }, hasCard
-            ? h("button", {
-              "aria-expanded": open ? "true" : "false",
-              "aria-controls": "lb-card-" + id,
-              className: "lb-name-btn",
-              type: "button",
-              onClick: () => toggle(id),
-            }, standingName(standing))
-            : standingName(standing)),
+          h("td", { className: "name", key: "name" }, [label, startLine(standing)]),
           h("td", { key: "thru" }, String(standing.thru || 0)),
-          isMatchplay
-            ? h("td", { key: "match" }, displayMatchStatus(standing.match))
-            : h("td", { className: "tp " + relClass(standing.toPar || 0), key: "toPar" }, standing.thru ? relText(standing.toPar || 0) : "E"),
+          resultCell(standing, isMatchplay, handicapped, relClass, relText),
         ]),
         open ? h("tr", { className: "lb-card-row", key: "card" }, h("td", { colSpan: 4, id: "lb-card-" + id }, h(StandingScorecard, { onHole, scorecard: standing.scorecard, standing }))) : null,
       ]);
     })),
+    ]),
   ]);
 }
 
