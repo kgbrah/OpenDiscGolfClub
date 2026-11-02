@@ -172,6 +172,43 @@ export function RoundHighlights(props) {
   ]);
 }
 
+function highestVideoConstraints(capabilities) {
+  const caps = capabilities || {};
+  const width = Number(caps.width && caps.width.max);
+  const height = Number(caps.height && caps.height.max);
+  return {
+    frameRate: { ideal: 30 },
+    width: { ideal: Number.isFinite(width) && width > 0 ? width : 3840 },
+    height: { ideal: Number.isFinite(height) && height > 0 ? height : 2160 },
+  };
+}
+
+function throwVideoBitrate(width, height) {
+  const pixels = (Number(width) || 1920) * (Number(height) || 1080);
+  const wanted = Math.round(pixels * 30 * 0.08);
+  // Twelve seconds at this rate, plus audio, stays under the 6MB clip limit.
+  return Math.min(Math.max(wanted, 2_000_000), 3_200_000);
+}
+
+async function useHighestCameraMode(stream) {
+  const track = stream.getVideoTracks()[0];
+  if (!track || typeof track.getCapabilities !== "function") return track || null;
+  const caps = track.getCapabilities() || {};
+  const settings = typeof track.getSettings === "function" ? track.getSettings() : {};
+  const maxW = Number(caps.width && caps.width.max) || 0;
+  const maxH = Number(caps.height && caps.height.max) || 0;
+  const curW = Number(settings.width) || 0;
+  const curH = Number(settings.height) || 0;
+  if (maxW > curW || maxH > curH) {
+    try {
+      await track.applyConstraints(highestVideoConstraints(caps));
+    } catch {
+      /* the open request already asked for the highest mode */
+    }
+  }
+  return track;
+}
+
 function recorderMime() {
   if (typeof MediaRecorder === "undefined") return "";
   if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) return "video/webm;codecs=vp8,opus";
@@ -260,12 +297,21 @@ function ThrowFilmSheet(props) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 640 } },
+        video: {
+          ...highestVideoConstraints(),
+          facingMode: { ideal: "environment" },
+        },
       });
       streamRef.current = stream;
+      const track = await useHighestCameraMode(stream);
+      const settings = track && typeof track.getSettings === "function" ? track.getSettings() : {};
       if (liveRef.current) liveRef.current.srcObject = stream;
       chunksRef.current = [];
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 700000 });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mime,
+        audioBitsPerSecond: 128000,
+        videoBitsPerSecond: throwVideoBitrate(settings.width, settings.height),
+      });
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size) chunksRef.current.push(event.data);
       };
