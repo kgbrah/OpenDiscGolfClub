@@ -11,9 +11,9 @@ const MORE_LINKS = [
   { tab: "courses", label: "Courses" },
   { tab: "layouts", label: "Layouts" },
   { tab: "tee-signs", label: "Tee signs" },
-  { tab: "leagues-mgmt", label: "Leagues" },
-  { tab: "fundraisers", label: "Fundraisers" },
-  { tab: "meetings", label: "Meetings" },
+  { tab: "leagues-mgmt", label: "League seasons" },
+  { tab: "fundraisers", label: "Campaigns" },
+  { tab: "meetings", label: "Minutes" },
   { tab: "members", label: "Members" },
   { tab: "data-archive", label: "Data archive" },
 ];

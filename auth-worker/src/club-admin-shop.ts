@@ -4,6 +4,8 @@ import { resolveMemberFlexible, type KVListLike } from "./roster.js";
 import { json, readJson } from "./http.js";
 import { asInt, asStr, inSet } from "./input.js";
 import { reverseStoreOrder } from "./order-reversal.js";
+import { decodeDataUrl } from "./photos.js";
+import { readProductLabel } from "./vision.js";
 
 const PRODUCT_CATEGORIES = ["disc", "accessory"] as const;
 const PRODUCT_ADMIN_STATUSES = ["active", "inactive", "all"] as const;
@@ -119,6 +121,20 @@ export async function handleAdminShop(
   seg: string[],
   adminId: string,
 ): Promise<Response | null> {
+  if (seg[1] === "shop" && seg[2] === "read-label" && method === "POST" && seg.length === 3) {
+    const body = await readJson(request, MAX_IMAGE_DATA_URL + 1_000);
+    const image = decodeDataUrl(body && typeof body === "object" ? (body as { image?: unknown }).image : null);
+    if (!image) return json({ error: "invalid_image" }, 400, origin);
+    const label = await readProductLabel(env, image.bytes, image.contentType);
+    return json({ fields: {
+      brand: label.brand,
+      color: label.color,
+      name: label.name,
+      price: label.price,
+      productType: label.productType,
+      weight: label.weight,
+    } }, 200, origin);
+  }
   if (seg[1] === "shop" && seg[2] === "products") {
     const id = seg[3] != null ? asInt(seg[3]) : null;
     if (method === "GET" && seg.length === 3) return json({ products: await shopDb.listStoreProducts(env.DB, adminProductListOptions(request)) }, 200, origin);

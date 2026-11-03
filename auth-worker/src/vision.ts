@@ -1,4 +1,4 @@
-// "Crotts" vision (T2): read a disc-golf tee sign photo into a per-layout suggestion. Mirrors
+import { EMPTY_PRODUCT_LABEL, parseProductLabel, PRODUCT_VISION_PROMPT, productLabelHasText, type ProductLabel } from "./product-vision.js";
 // assistant.ts's provider-chain pattern. parseVisionJson is PURE (unit-tested); the providers do I/O.
 // Output is ONLY a suggestion — an admin confirms before anything reaches scoring.
 
@@ -226,4 +226,22 @@ export async function describeRulingImage(env: VisionEnv, bytes: Uint8Array, con
     try { const text = await workersAiText(env, bytes, RULING_VISION_PROMPT); if (text) return text; } catch { /* next */ }
   }
   return "";
+}
+
+export async function readProductLabel(env: VisionEnv, bytes: Uint8Array, contentType: string): Promise<ProductLabel & { source: string | null }> {
+  if (env.VISION_DEV_STUB) {
+    return { name: "Destroyer", brand: "Innova", productType: "distance_driver", color: "red", weight: "175", price: "18", source: "dev-stub" };
+  }
+  const prompts = [PRODUCT_VISION_PROMPT];
+  const readers: Array<() => Promise<string>> = [];
+  if (env.GEMINI_API_KEY) readers.push(() => geminiText(env, bytes, contentType, prompts[0]!));
+  if (env.OPENROUTER_API_KEY) readers.push(() => openRouterText(env, bytes, contentType, prompts[0]!));
+  if (env.AI) readers.push(() => workersAiText(env, bytes, prompts[0]!));
+  for (const read of readers) {
+    try {
+      const label = parseProductLabel(await read());
+      if (productLabelHasText(label)) return { ...label, source: "vision" };
+    } catch { /* next provider */ }
+  }
+  return { ...EMPTY_PRODUCT_LABEL, source: null };
 }

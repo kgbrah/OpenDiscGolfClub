@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   bucketAdminEvents,
+  calendarEntries,
   formatAdminEventWhen,
   normalizeAdminEvent,
   pickTodayEvent,
@@ -27,6 +28,19 @@ test("admin event buckets put live first and keep scheduled upcoming", () => {
   const todaysRound = normalizeAdminEvent({ id: 5, name: "Today's round", status: "scheduled", date: today });
   assert.equal(pickTodayEvent([laterSameStatus, todaysRound]).id, "5");
   assert.match(formatAdminEventWhen(live), /[A-Z][a-z]{2}/);
+});
+
+test("the calendar keeps campaigns and minutes beside rounds", () => {
+  const round = normalizeAdminEvent({ id: 9, name: "Saturday league", status: "scheduled", type: "league_round", date: "2026-11-07" });
+  const rows = calendarEntries([round], {
+    fundraisers: [{ id: 3, title: "Baskets", status: "active", starts_at: "2026-11-01" }],
+    meetings: [{ id: 4, title: "Board", date: "2026-11-10" }],
+  }, "2026-11-02");
+  assert.deepEqual(rows.map((row) => [row.kind, row.bucket, row.name]), [
+    ["event", "rounds", "Saturday league"],
+    ["campaign", "fundraiser", "Baskets"],
+    ["minutes", "meeting", "Board"],
+  ]);
 });
 
 test("admin today, more, and player theme are wired into the admin shell", () => {

@@ -90,6 +90,19 @@ function optionNodes(options) {
   return options.map(([value, label]) => h("option", { key: value, value }, label));
 }
 
+function fillBlankProductFields(form, fields) {
+  const next = { ...form };
+  const fresh = !String(form.name || "").trim();
+  for (const key of ["name", "brand", "color", "weight", "price"]) {
+    if (fields[key] && !String(form[key] || "").trim()) next[key] = String(fields[key]);
+  }
+  if (fields.productType && fresh) {
+    next.productType = String(fields.productType);
+    next.category = ["bag", "apparel", "accessory"].includes(fields.productType) ? "accessory" : "disc";
+  }
+  return next;
+}
+
 function formBody(form) {
   const price = dollarsToCents(form.price);
   return {
@@ -112,9 +125,11 @@ function formBody(form) {
 export function AdminProductForm() {
   const [form, setForm] = React.useState(EMPTY_FORM);
   const [busy, setBusy] = React.useState(false);
+  const [readNote, setReadNote] = React.useState("");
   const fileRef = React.useRef(null);
   const requestCounter = React.useRef(0);
   const currentRequest = React.useRef("");
+  const readRequest = React.useRef("");
 
   React.useEffect(() => {
     function update(event) {
@@ -125,6 +140,7 @@ export function AdminProductForm() {
         setForm(EMPTY_FORM);
         if (fileRef.current) fileRef.current.value = "";
         currentRequest.current = "";
+        setReadNote("");
       }
     }
     window.addEventListener("gvdg:admin-product-create-result", update);
@@ -158,6 +174,22 @@ export function AdminProductForm() {
     return () => window.removeEventListener("gvdg:admin-product-repeat", repeat);
   }, []);
 
+  React.useEffect(() => {
+    function filled(event) {
+      const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
+      if (!detail.requestId || detail.requestId !== readRequest.current) return;
+      const fields = detail.fields && typeof detail.fields === "object" ? detail.fields : null;
+      if (!fields) {
+        setReadNote("Couldn't read the stamp. Type the blanks.");
+        return;
+      }
+      setForm((current) => fillBlankProductFields(current, fields));
+      setReadNote("Filled from the photo. Change anything that's wrong.");
+    }
+    window.addEventListener("gvdg:admin-product-read-result", filled);
+    return () => window.removeEventListener("gvdg:admin-product-read-result", filled);
+  }, []);
+
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
   }
@@ -168,6 +200,10 @@ export function AdminProductForm() {
     try {
       const dataUrl = await resizeImageToDataUrl(file, 700, 0.78);
       setForm((current) => ({ ...current, imageUrl: "", uploadedImageUrl: dataUrl }));
+      const requestId = `product-read-${requestCounter.current += 1}`;
+      readRequest.current = requestId;
+      setReadNote("Reading the stamp…");
+      dispatchRequest("gvdg:admin-product-read-request", { image: dataUrl, requestId });
       dispatchRequest("gvdg:admin-product-photo-ready", { sizeKb: Math.round(dataUrl.length / 1024) });
     } catch {
       dispatchRequest("gvdg:admin-product-photo-error", {});
@@ -250,7 +286,7 @@ export function AdminProductForm() {
           key: "image",
           src: form.uploadedImageUrl,
         }),
-        h("figcaption", { className: "admin-product-image-preview-note", key: "caption" }, "Selected upload will be saved when you add the product."),
+        h("figcaption", { className: "admin-product-image-preview-note", key: "caption" }, readNote || "Selected upload will be saved when you add the product."),
       ]) : null,
     ]),
     h("div", { className: "admin-product-form-wide", key: "description" }, [

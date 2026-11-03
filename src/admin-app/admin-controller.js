@@ -86,6 +86,7 @@ export function startAdminController() {
             const eventId = detail && detail.eventId != null && detail.eventId !== '' ? detail.eventId : null;
             if (tab === 'create') { adminLoadCourses(); adminLoadLeagues(); }
             if (tab === 'today' || tab === 'events') adminLoadEvents();
+            if (tab === 'events') { adminLoadFundraisers(); adminLoadMeetings(); }
             if (tab === 'today') adminLoadShelf();
             if (tab === 'scoring') {
                 await scLoadEvents();
@@ -1388,6 +1389,17 @@ export function startAdminController() {
             });
             window.addEventListener('gvdg:admin-product-create-request', async (event) => {
                 await adminCreateProductFromReact(event.detail || {});
+            });
+            window.addEventListener('gvdg:admin-product-read-request', async (event) => {
+                const detail = event.detail || {};
+                const requestId = detail.requestId;
+                if (!requestId || !detail.image) return;
+                let fields = null;
+                try {
+                    const r = await adminApi('/admin/shop/read-label', { method: 'POST', body: { image: detail.image } });
+                    if (r.ok) fields = (await r.json()).fields || null;
+                } catch (e) {}
+                window.dispatchEvent(new CustomEvent('gvdg:admin-product-read-result', { detail: { requestId, fields } }));
             });
             window.addEventListener('gvdg:admin-order-save-request', async (event) => {
                 const detail = event.detail || {};

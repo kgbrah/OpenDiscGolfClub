@@ -3,10 +3,12 @@ import React from "react";
 import { adminConfirm } from "./admin-dialogs.js";
 import {
   bucketAdminEvents,
+  calendarEntries,
   formatAdminEventPlace,
   formatAdminEventWhen,
   normalizeAdminEvent,
 } from "./admin-events-model.js";
+import { clubToday, statusLabel, typeLabel } from "../shared/events-model.js";
 
 const h = React.createElement;
 
@@ -17,6 +19,12 @@ const FILTERS = [
   { id: "upcoming", label: "Upcoming" },
   { id: "live", label: "Live" },
   { id: "past", label: "Past" },
+];
+const KINDS = [
+  { id: "all", label: "All" },
+  { id: "rounds", label: "Rounds" },
+  { id: "fundraiser", label: "Fundraisers" },
+  { id: "meeting", label: "Meetings" },
 ];
 
 function normalizeState(state) {
@@ -85,26 +93,29 @@ function AdminEventRow({ event }) {
       className: "admin-event-card-main",
       key: "main",
       onClick: () => {
-        if (event.status === "live") requestTab("scoring", { eventId: event.id });
+        if (event.kind === "campaign") requestTab("fundraisers");
+        else if (event.kind === "minutes") requestTab("meetings");
+        else if (event.status === "live") requestTab("scoring", { eventId: event.id });
         else if (event.status === "scheduled") requestTab("registration", { eventId: event.id });
         else dispatchRequest("gvdg:admin-event-edit-request", { event: event.source });
       },
       type: "button",
     }, [
       h("span", { className: "ev-name", key: "name" }, event.name),
+      h("span", { className: "admin-event-meta", key: "type" }, event.kind === "campaign" ? "Campaign" : event.kind === "minutes" ? "Minutes" : typeLabel(event.type)),
       when ? h("span", { className: "admin-event-meta", key: "when" }, when) : null,
       place ? h("span", { className: "admin-event-meta", key: "place" }, place) : null,
     ]),
-    h("span", { className: `admin-badge ${event.status}`, key: "status" }, event.status),
-    h("button", {
+    h("span", { className: `admin-badge ${event.status}`, key: "status" }, event.kind === "event" ? statusLabel(event.status) : event.kind === "campaign" ? (event.status === "scheduled" ? "Active" : "Closed") : (event.status === "scheduled" ? "Coming up" : "Past")),
+    event.kind === "event" ? h("button", {
       "aria-expanded": menuOpen ? "true" : "false",
       "aria-label": `More actions for ${event.name}`,
       className: "admin-event-more",
       key: "more",
       onClick: () => setMenuOpen((open) => !open),
       type: "button",
-    }, "···"),
-    menuOpen ? h("div", { className: "admin-event-menu", key: "menu" }, [
+    }, "···") : null,
+    event.kind === "event" && menuOpen ? h("div", { className: "admin-event-menu", key: "menu" }, [
       h("label", { className: "admin-event-menu-status", key: "status" }, [
         "Status",
         h("select", {
@@ -139,13 +150,30 @@ function AdminEventRow({ event }) {
 export function AdminEventsList() {
   const [state, setState] = React.useState(() => normalizeState(EMPTY_STATE));
   const [filter, setFilter] = React.useState("upcoming");
+  const [kind, setKind] = React.useState("all");
+  const [fundraisers, setFundraisers] = React.useState([]);
+  const [meetings, setMeetings] = React.useState([]);
 
   React.useEffect(() => {
     function update(event) {
       setState(normalizeState(event.detail && typeof event.detail === "object" ? event.detail : EMPTY_STATE));
     }
     window.addEventListener("gvdg:admin-events-list", update);
-    return () => window.removeEventListener("gvdg:admin-events-list", update);
+    function updateFundraisers(event) {
+      const items = event.detail && Array.isArray(event.detail.fundraisers) ? event.detail.fundraisers : [];
+      setFundraisers(items);
+    }
+    function updateMeetings(event) {
+      const items = event.detail && Array.isArray(event.detail.meetings) ? event.detail.meetings : [];
+      setMeetings(items);
+    }
+    window.addEventListener("gvdg:admin-fundraisers-list", updateFundraisers);
+    window.addEventListener("gvdg:admin-meetings-list", updateMeetings);
+    return () => {
+      window.removeEventListener("gvdg:admin-events-list", update);
+      window.removeEventListener("gvdg:admin-fundraisers-list", updateFundraisers);
+      window.removeEventListener("gvdg:admin-meetings-list", updateMeetings);
+    };
   }, []);
 
   if (state.status === "loading") {
@@ -156,7 +184,7 @@ export function AdminEventsList() {
     }, "Loading…");
   }
 
-  if (!state.events.length) {
+  if (!state.events.length && !fundraisers.length && !meetings.length) {
     return h("div", { "data-react-admin-events-list": "empty" }, [
       h("p", { className: "dash-note", key: "empty", role: "status" }, "No events yet — create or import one."),
       h("button", {
@@ -171,12 +199,13 @@ export function AdminEventsList() {
     ]);
   }
 
-  const buckets = bucketAdminEvents(state.events);
-  const rows = filter === "live"
+  const buckets = bucketAdminEvents(calendarEntries(state.events, { fundraisers, meetings }, clubToday()));
+  const timed = filter === "live"
     ? buckets.live
     : filter === "past"
       ? buckets.past
       : [...buckets.live, ...buckets.upcoming];
+  const rows = kind === "all" ? timed : timed.filter((event) => event.bucket === kind);
 
   return h("div", { "data-react-admin-events-list": "ready" }, [
     h("div", { className: "admin-events-toolbar", key: "toolbar" }, [
@@ -191,6 +220,13 @@ export function AdminEventsList() {
         type: "button",
       }, "New event"),
     ]),
+    h("div", { className: "admin-seg", key: "kinds", role: "tablist", "aria-label": "Calendar types" }, KINDS.map((item) => h("button", {
+      "aria-selected": kind === item.id ? "true" : "false",
+      className: kind === item.id ? "on" : "",
+      key: item.id,
+      onClick: () => setKind(item.id),
+      type: "button",
+    }, item.label))),
     h("div", { className: "admin-seg", key: "filters", role: "tablist", "aria-label": "Event filters" }, FILTERS.map((item) => h("button", {
       "aria-selected": filter === item.id ? "true" : "false",
       className: filter === item.id ? "on" : "",
