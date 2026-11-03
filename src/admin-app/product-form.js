@@ -2,6 +2,7 @@ import React from "react";
 
 import { applyShopVoice, VoiceFill } from "./voice-fill.js";
 import { usualPriceDollars } from "./desk-model.js";
+import { SHOP_BRANDS, SHOP_COLORS, SHOP_CUSTOM, choiceOptions, matchChoice, weightOptions } from "./shop-choices.js";
 
 const h = React.createElement;
 
@@ -91,6 +92,43 @@ function optionNodes(options) {
   return options.map(([value, label]) => h("option", { key: value, value }, label));
 }
 
+function ChoiceField({ extras, id, label, options, value, onChange, maxLength }) {
+  const [customOn, setCustomOn] = React.useState(false);
+  const known = choiceOptions(options, extras);
+  const matched = matchChoice(value, known);
+  const custom = customOn || (Boolean(value) && !matched);
+  return h("div", null, [
+    h("label", { htmlFor: id, key: "label" }, label),
+    h("select", {
+      id,
+      key: "input",
+      onChange: (event) => {
+        const next = event.target.value;
+        if (next === SHOP_CUSTOM) {
+          setCustomOn(true);
+          if (matched) onChange("");
+          return;
+        }
+        setCustomOn(false);
+        onChange(next);
+      },
+      value: custom ? SHOP_CUSTOM : matched,
+    }, [
+      h("option", { key: "blank", value: "" }, "Choose"),
+      ...known.map((option) => h("option", { key: option, value: option }, option)),
+      h("option", { key: "custom", value: SHOP_CUSTOM }, "Custom"),
+    ]),
+    custom ? h("input", {
+      "aria-label": `Custom ${label}`,
+      key: "custom",
+      maxLength: maxLength || 80,
+      onChange: (event) => onChange(event.target.value),
+      placeholder: "Type it",
+      value,
+    }) : null,
+  ]);
+}
+
 function fillBlankProductFields(form, fields) {
   const next = { ...form };
   const fresh = !String(form.name || "").trim();
@@ -132,6 +170,7 @@ export function AdminProductForm() {
   const currentRequest = React.useRef("");
   const readRequest = React.useRef("");
   const catalogRef = React.useRef([]);
+  const [shelf, setShelf] = React.useState({ brands: [], colors: [], weights: [] });
 
   React.useEffect(() => {
     function update(event) {
@@ -205,6 +244,11 @@ export function AdminProductForm() {
       if (detail.status === "loading") return;
       const products = Array.isArray(detail.products) ? detail.products : [];
       catalogRef.current = products;
+      setShelf({
+        brands: products.map((product) => product.brand),
+        colors: products.map((product) => product.color),
+        weights: products.map((product) => product.weight_g == null ? "" : String(product.weight_g)),
+      });
       setForm((current) => {
         if (current.price || !current.name) return current;
         const price = usualPriceDollars(products, current.name);
@@ -273,22 +317,40 @@ export function AdminProductForm() {
         return price ? { ...current, price } : current;
       }), onChange: (event) => updateField("name", event.target.value), required: true, value: form.name }),
     ]),
-    h("div", { key: "brand" }, [
-      h("label", { htmlFor: "psBrand", key: "label" }, "Brand"),
-      h(hInput, { id: "psBrand", key: "input", maxLength: 80, onChange: (event) => updateField("brand", event.target.value), placeholder: "Innova, Discraft, MVP", value: form.brand }),
-    ]),
+    h(ChoiceField, {
+      extras: shelf.brands,
+      id: "psBrand",
+      key: "brand",
+      label: "Brand",
+      maxLength: 80,
+      onChange: (value) => updateField("brand", value),
+      options: SHOP_BRANDS,
+      value: form.brand,
+    }),
     h("div", { key: "type" }, [
       h("label", { htmlFor: "psType", key: "label" }, "Type"),
       h("select", { id: "psType", key: "input", onChange: (event) => updateField("productType", event.target.value), value: form.productType }, optionNodes(TYPE_OPTIONS)),
     ]),
-    h("div", { key: "color" }, [
-      h("label", { htmlFor: "psColor", key: "label" }, "Color"),
-      h(hInput, { id: "psColor", key: "input", maxLength: 60, onChange: (event) => updateField("color", event.target.value), value: form.color }),
-    ]),
-    h("div", { key: "weight" }, [
-      h("label", { htmlFor: "psWeight", key: "label" }, "Weight (g)"),
-      h(hInput, { id: "psWeight", key: "input", min: "0", onChange: (event) => updateField("weight", event.target.value), step: "1", type: "number", value: form.weight }),
-    ]),
+    h(ChoiceField, {
+      extras: shelf.colors,
+      id: "psColor",
+      key: "color",
+      label: "Color",
+      maxLength: 60,
+      onChange: (value) => updateField("color", value),
+      options: SHOP_COLORS,
+      value: form.color,
+    }),
+    h(ChoiceField, {
+      extras: shelf.weights,
+      id: "psWeight",
+      key: "weight",
+      label: "Weight (g)",
+      maxLength: 6,
+      onChange: (value) => updateField("weight", value.replace(/[^\d]/g, "")),
+      options: weightOptions(shelf.weights),
+      value: form.weight,
+    }),
     h("div", { key: "price" }, [
       h("label", { htmlFor: "psPrice", key: "label" }, "Price ($)"),
       h(hInput, { id: "psPrice", key: "input", min: "0", onChange: (event) => updateField("price", event.target.value), required: true, step: "0.01", type: "number", value: form.price }),
