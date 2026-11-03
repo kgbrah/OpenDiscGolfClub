@@ -30,6 +30,15 @@ test("the counter hands off a ready order and remembers the usual price", () => 
   ], "destroyer"), "18");
 });
 
+test("a finished one-off match is not offered as next week", () => {
+  const events = [
+    { date: "2026-10-31", name: "#4 KG/TJ vs MIKE/CALEB RYDER CUP DUBS", status: "final", type: "league_round" },
+    { date: "2026-10-24", name: "Saturday league", status: "final", type: "league_round" },
+  ];
+  assert.match(nextWeekOffer(events, "2026-11-02").label, /Saturday league/);
+  assert.equal(nextWeekOffer([events[0]], "2026-11-02"), null);
+});
+
 test("next week is offered only when that Saturday is not already on the calendar", () => {
   const events = [
     { date: "2026-10-31", name: "Saturday league", status: "final", type: "league_round" },

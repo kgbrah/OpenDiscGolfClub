@@ -80,15 +80,22 @@ export function repeatLabel(event, nextDate) {
   return `Same as ${name} · ${when}`;
 }
 
+function isWeeklyLeague(event) {
+  if (!event || event.type !== "league_round" || event.status === "cancelled") return false;
+  const name = String(event.name || "").trim();
+  if (!name || /\bvs\.?\b/i.test(name) || /^#?\d+\b/.test(name)) return false;
+  return DATE.test(eventDay(event));
+}
+
 export function nextWeekOffer(events, today) {
-  const source = pickRepeatEvent(events, today);
-  const day = source ? String(source.date || "").slice(0, 10) : "";
+  const source = pickRepeatEvent((Array.isArray(events) ? events : []).filter(isWeeklyLeague), today);
+  const day = source ? eventDay(source) : "";
   if (!source || !DATE.test(day) || day > String(today || "")) return null;
   const nextDate = nextWeeklyDate(day, today);
   if (!nextDate) return null;
   const taken = (Array.isArray(events) ? events : []).some((event) => {
     if (!event || event.status === "cancelled") return false;
-    return String(event.date || "").slice(0, 10) === nextDate && String(event.name || "") === String(source.name || "");
+    return eventDay(event) === nextDate && String(event.name || "") === String(source.name || "");
   });
   if (taken) return null;
   return { label: `Put ${source.name} on the calendar`, nextDate, source };
