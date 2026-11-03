@@ -357,6 +357,18 @@
         .admin-pane-heading { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.03em; margin: 0 0 0.75rem; }
         .admin-pane-kicker { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin: 1rem 0 0.45rem; }
         .admin-today-card { border: 1px solid var(--border-color); border-radius: 16px; background: var(--bg-secondary); padding: 0.9rem 1rem; margin-bottom: 0.75rem; }
+        .admin-desk { display: grid; gap: 0.4rem; margin: 0.75rem 0; }
+        .admin-desk-line { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; width: 100%; min-height: 48px; padding: 0.65rem 0.8rem; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-tertiary); color: inherit; font: inherit; font-weight: 700; text-align: left; }
+        .admin-desk-line.in { opacity: 0.62; }
+        .admin-handoff { display: grid; gap: 0.45rem; }
+        .shop-counter { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 0.55rem; }
+        .shop-tile-card { display: grid; gap: 0.4rem; align-content: start; }
+        .shop-tile-card.editing { grid-column: 1 / -1; }
+        .shop-tile-card.inactive { opacity: 0.72; }
+        .shop-tile { display: grid; gap: 0.28rem; justify-items: start; width: 100%; min-height: 112px; padding: 0.7rem; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-secondary); color: inherit; font: inherit; text-align: left; }
+        .shop-tile.on { border-color: var(--primary-strong); }
+        .shop-tile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+        .shop-tile-actions .admin-btn:first-child { grid-column: 1 / -1; }
         .admin-today-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
         .admin-today-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; margin-bottom: 0.85rem; }
         .admin-today-tile { display: grid; gap: 0.2rem; text-align: left; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-secondary); color: var(--text-primary); padding: 0.65rem 0.6rem; cursor: pointer; }

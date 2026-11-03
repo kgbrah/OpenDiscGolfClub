@@ -697,8 +697,8 @@ test('admin product inventory list is rendered by React from direct loader event
   assert.match(productsList, /gvdg:admin-product-delete-request/);
   assert.doesNotMatch(productsList, /currentAdminState\("productsList"|admin-state-store|function currentState/);
   assert.match(productsList, /data-react-admin-products-list/);
-  assert.match(productsList, /className: "shop-admin-list"/);
-  assert.match(productsList, /className: `shop-admin-row/);
+  assert.match(productsList, /className: "shop-admin-list shop-counter"/);
+  assert.match(productsList, /className: open \? "shop-tile on" : "shop-tile"/);
   assert.match(productsList, /className: "shop-admin-thumb"/);
   assert.match(productsList, /className: "shop-admin-thumb fallback"/);
   assert.match(productsList, /className: "shop-admin-controls"/);

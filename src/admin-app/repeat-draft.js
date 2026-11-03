@@ -79,3 +79,17 @@ export function repeatLabel(event, nextDate) {
   });
   return `Same as ${name} · ${when}`;
 }
+
+export function nextWeekOffer(events, today) {
+  const source = pickRepeatEvent(events, today);
+  const day = source ? String(source.date || "").slice(0, 10) : "";
+  if (!source || !DATE.test(day) || day > String(today || "")) return null;
+  const nextDate = nextWeeklyDate(day, today);
+  if (!nextDate) return null;
+  const taken = (Array.isArray(events) ? events : []).some((event) => {
+    if (!event || event.status === "cancelled") return false;
+    return String(event.date || "").slice(0, 10) === nextDate && String(event.name || "") === String(source.name || "");
+  });
+  if (taken) return null;
+  return { label: `Put ${source.name} on the calendar`, nextDate, source };
+}

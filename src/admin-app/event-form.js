@@ -219,6 +219,21 @@ function eventPayload(form, courseRows, quickLayout) {
   return { body, labelText: body.name, valid: true };
 }
 
+export function repeatSavePayload(source, today = clubToday(new Date())) {
+  const base = formFromEvent(source);
+  const anchor = base.date || String(base.startsAt || "").slice(0, 10);
+  const nextDate = nextWeeklyDate(anchor, today) || anchor;
+  const days = calendarDaysBetween(anchor, nextDate);
+  return eventPayload({
+    ...base,
+    checkinDeadline: shiftWallByDays(base.checkinDeadline, days),
+    date: nextDate,
+    registrationDeadline: shiftWallByDays(base.registrationDeadline, days),
+    startsAt: shiftWallByDays(base.startsAt, days),
+    status: "scheduled",
+  }, courseRowsFromEvent(source), { defaultPar: "3", holeCount: "18", name: "" });
+}
+
 function wallClockLabel(value) {
   const match = String(value || "").match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
   if (!match) return "";

@@ -1,6 +1,7 @@
 import React from "react";
 
 import { applyShopVoice, VoiceFill } from "./voice-fill.js";
+import { usualPriceDollars } from "./desk-model.js";
 
 const h = React.createElement;
 
@@ -130,6 +131,7 @@ export function AdminProductForm() {
   const requestCounter = React.useRef(0);
   const currentRequest = React.useRef("");
   const readRequest = React.useRef("");
+  const catalogRef = React.useRef([]);
 
   React.useEffect(() => {
     function update(event) {
@@ -183,11 +185,34 @@ export function AdminProductForm() {
         setReadNote("Couldn't read the stamp. Type the blanks.");
         return;
       }
-      setForm((current) => fillBlankProductFields(current, fields));
+      setForm((current) => {
+        const next = fillBlankProductFields(current, fields);
+        if (!next.price && next.name) {
+          const price = usualPriceDollars(catalogRef.current, next.name);
+          if (price) next.price = price;
+        }
+        return next;
+      });
       setReadNote("Filled from the photo. Change anything that's wrong.");
     }
     window.addEventListener("gvdg:admin-product-read-result", filled);
     return () => window.removeEventListener("gvdg:admin-product-read-result", filled);
+  }, []);
+
+  React.useEffect(() => {
+    function updateCatalog(event) {
+      const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
+      if (detail.status === "loading") return;
+      const products = Array.isArray(detail.products) ? detail.products : [];
+      catalogRef.current = products;
+      setForm((current) => {
+        if (current.price || !current.name) return current;
+        const price = usualPriceDollars(products, current.name);
+        return price ? { ...current, price } : current;
+      });
+    }
+    window.addEventListener("gvdg:admin-products-list", updateCatalog);
+    return () => window.removeEventListener("gvdg:admin-products-list", updateCatalog);
   }, []);
 
   function updateField(field, value) {
@@ -242,7 +267,11 @@ export function AdminProductForm() {
     ]),
     h("div", { key: "name" }, [
       h("label", { htmlFor: "psName", key: "label" }, "Product name"),
-      h(hInput, { id: "psName", key: "input", maxLength: 160, onChange: (event) => updateField("name", event.target.value), required: true, value: form.name }),
+      h(hInput, { id: "psName", key: "input", maxLength: 160, onBlur: () => setForm((current) => {
+        if (current.price || !current.name) return current;
+        const price = usualPriceDollars(catalogRef.current, current.name);
+        return price ? { ...current, price } : current;
+      }), onChange: (event) => updateField("name", event.target.value), required: true, value: form.name }),
     ]),
     h("div", { key: "brand" }, [
       h("label", { htmlFor: "psBrand", key: "label" }, "Brand"),

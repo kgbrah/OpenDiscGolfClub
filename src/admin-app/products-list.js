@@ -63,18 +63,6 @@ function priceInputValue(cents) {
   return String(Number(cents) / 100);
 }
 
-function productMeta(product, active) {
-  return [
-    product.brand,
-    product.productType,
-    product.color,
-    product.weightG != null ? `${product.weightG}g` : "",
-    product.priceCents != null ? dollarsFromCents(product.priceCents) : "",
-    `${product.stockQty || 0} in stock`,
-    active ? "active" : "archived",
-  ].filter(Boolean).join(" - ") || "No metadata";
-}
-
 function ProductThumb({ product }) {
   if (product.imageUrl) {
     return h("img", {
@@ -93,6 +81,8 @@ function ProductRow({ product }) {
   const [priceValue, setPriceValue] = React.useState(() => priceInputValue(product.priceCents));
   const [stockValue, setStockValue] = React.useState(() => String(product.stockQty || 0));
   const [active, setActive] = React.useState(() => product.active);
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
 
   React.useEffect(() => {
     setPriceValue(priceInputValue(product.priceCents));
@@ -148,13 +138,30 @@ function ProductRow({ product }) {
     dispatchRequest("gvdg:admin-product-delete-request", { product: product.source });
   }
 
-  return h("div", { className: `shop-admin-row${active ? "" : " inactive"}`, "data-admin-product-id": product.id }, [
-    h(ProductThumb, { key: "thumb", product }),
-    h("div", { key: "info" }, [
-      h("div", { className: "ev-name", key: "name" }, product.name),
-      h("div", { className: "shop-admin-meta", key: "meta" }, productMeta(product, active)),
+  return h("div", { className: `shop-tile-card${editing ? " editing" : ""}${active ? "" : " inactive"}`, "data-admin-product-id": product.id }, [
+    h("button", {
+      className: open ? "shop-tile on" : "shop-tile",
+      key: "tile",
+      onClick: () => {
+        setOpen((current) => !current);
+        setEditing(false);
+      },
+      type: "button",
+    }, [
+      h(ProductThumb, { key: "thumb", product }),
+      h("span", { className: "ev-name", key: "name" }, product.name),
+      h("span", { className: "shop-admin-meta", key: "meta" }, [
+        product.priceCents != null ? dollarsFromCents(product.priceCents) : "No price",
+        ` · ${product.stockQty || 0} left`,
+        product.color ? ` · ${product.color}` : "",
+      ].join("")),
     ]),
-    h("div", { className: "shop-admin-controls", key: "controls" }, [
+    open && !editing ? h("div", { className: "shop-tile-actions", key: "actions" }, [
+      h("button", { className: "admin-btn", disabled: Number(stockValue) < 1, key: "sold", onClick: sellOne, type: "button" }, Number(stockValue) < 1 ? "Sold out" : "Sold"),
+      h("button", { className: "admin-btn secondary", key: "another", onClick: requestAnother, type: "button" }, "Add another"),
+      h("button", { className: "admin-btn secondary", key: "edit", onClick: () => setEditing(true), type: "button" }, "Edit"),
+    ]) : null,
+    editing ? h("div", { className: "shop-admin-controls", key: "controls" }, [
       h("input", {
         "aria-label": `Price for ${product.name}`,
         key: "price",
@@ -182,11 +189,9 @@ function ProductRow({ product }) {
         }),
         active ? " active" : " archived",
       ]),
-      h("button", { className: "admin-btn", disabled: Number(stockValue) < 1, key: "sold", onClick: sellOne, type: "button" }, Number(stockValue) < 1 ? "Sold out" : "Sold"),
-      h("button", { className: "admin-btn secondary", key: "another", onClick: requestAnother, type: "button" }, "Add another"),
       h("button", { className: "admin-btn secondary", key: "save", onClick: requestSave, type: "button" }, "Save"),
       h("button", { className: "admin-btn danger", key: "delete", onClick: requestDelete, type: "button" }, "Delete"),
-    ]),
+    ]) : null,
   ]);
 }
 
@@ -209,7 +214,7 @@ export function AdminProductsList() {
     return h("p", { className: "al-note", "data-react-admin-products-list": "empty", role: "status" }, state.inventoryStatus === "inactive" ? "No archived products." : "No products yet.");
   }
 
-  return h("div", { className: "shop-admin-list", "data-react-admin-products-list": "ready" }, state.products.map((product, index) => (
+  return h("div", { className: "shop-admin-list shop-counter", "data-react-admin-products-list": "ready" }, state.products.map((product, index) => (
     h(ProductRow, {
       key: product.id || `${product.name}-${index}`,
       product,

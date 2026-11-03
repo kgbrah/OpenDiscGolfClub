@@ -87,7 +87,7 @@ export function startAdminController() {
             if (tab === 'create') { adminLoadCourses(); adminLoadLeagues(); }
             if (tab === 'today' || tab === 'events') adminLoadEvents();
             if (tab === 'events') { adminLoadFundraisers(); adminLoadMeetings(); }
-            if (tab === 'today') adminLoadShelf();
+            if (tab === 'today') { adminLoadShelf(); adminLoadOrders(); }
             if (tab === 'scoring') {
                 await scLoadEvents();
                 if (eventId) await scSelectEventFromReact({ eventId });
@@ -1001,6 +1001,23 @@ export function startAdminController() {
         function setAdminRegistrationRosterState(state) {
             window.dispatchEvent(new CustomEvent('gvdg:admin-registration-roster', { detail: state }));
         }
+        async function adminLoadDesk(eventId, quiet) {
+            const id = Number(eventId);
+            if (!id) return;
+            if (!quiet) window.dispatchEvent(new CustomEvent('gvdg:admin-desk', { detail: { eventId: String(id), status: 'loading', players: [] } }));
+            let regs = [];
+            let ok = true;
+            try {
+                const r = await adminApi('/admin/events/' + id + '/registrations');
+                if (!r.ok) throw new Error('desk_failed');
+                regs = (await r.json()).registrations || [];
+            } catch (e) { ok = false; }
+            window.dispatchEvent(new CustomEvent('gvdg:admin-desk', { detail: {
+                eventId: String(id),
+                players: regs.map((row) => ({ checkedIn: Boolean(row.checked_in), id: row.id, name: row.name || 'Player', paid: Boolean(row.paid_entry) })),
+                status: ok ? 'ready' : 'error',
+            } }));
+        }
         async function rgAddManualPlayerFromReact(detail) {
             const requestId = detail.requestId;
             if (!requestId) return;
@@ -1446,6 +1463,20 @@ export function startAdminController() {
             });
             window.addEventListener('gvdg:admin-registration-event-select-request', async (event) => {
                 await rgSelectEventFromReact(event.detail || {});
+            });
+            window.addEventListener('gvdg:admin-desk-request', async (event) => {
+                await adminLoadDesk(event.detail && event.detail.eventId);
+            });
+            window.addEventListener('gvdg:admin-desk-tap-request', async (event) => {
+                const detail = event.detail || {};
+                const eventId = Number(detail.eventId);
+                const registrationId = detail.registrationId;
+                if (!eventId || registrationId == null) return;
+                const patch = detail.settle ? { checked_in: true, paid_entry: true } : { checked_in: false };
+                const r = await adminApi('/admin/events/' + eventId + '/registrations/' + registrationId, { method: 'PATCH', body: patch });
+                if (!r.ok) adminMsg('Check-in failed', false);
+                if (r.ok && Number(rgEventId) === eventId) rgLoadRoster();
+                await adminLoadDesk(eventId, true);
             });
             window.addEventListener('gvdg:admin-registration-config-save-request', async (event) => {
                 await rgSaveConfigFromReact(event.detail || {});
