@@ -131,6 +131,33 @@ export function AdminProductForm() {
     return () => window.removeEventListener("gvdg:admin-product-create-result", update);
   }, []);
 
+  React.useEffect(() => {
+    function repeat(event) {
+      const product = event.detail && event.detail.product;
+      if (!product) return;
+      setForm({
+        brand: product.brand || "",
+        category: product.category || "disc",
+        color: product.color || "",
+        description: product.description || "",
+        imageUrl: product.imageUrl || "",
+        name: product.name || "",
+        price: product.price || "",
+        productType: product.productType || "distance_driver",
+        stock: "1",
+        uploadedImageUrl: "",
+        weight: product.weight || "",
+      });
+      window.requestAnimationFrame(() => {
+        const color = document.getElementById("psColor");
+        color?.focus();
+        color?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+    window.addEventListener("gvdg:admin-product-repeat", repeat);
+    return () => window.removeEventListener("gvdg:admin-product-repeat", repeat);
+  }, []);
+
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
   }

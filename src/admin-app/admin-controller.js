@@ -86,6 +86,7 @@ export function startAdminController() {
             const eventId = detail && detail.eventId != null && detail.eventId !== '' ? detail.eventId : null;
             if (tab === 'create') { adminLoadCourses(); adminLoadLeagues(); }
             if (tab === 'today' || tab === 'events') adminLoadEvents();
+            if (tab === 'today') adminLoadShelf();
             if (tab === 'scoring') {
                 await scLoadEvents();
                 if (eventId) await scSelectEventFromReact({ eventId });
@@ -171,9 +172,16 @@ export function startAdminController() {
                 return;
             }
             if (r.ok) {
-                adminMsg((detail.eventId != null ? 'Updated' : 'Created') + ' "' + body.name + '"', true);
-                window.dispatchEvent(new CustomEvent('gvdg:admin-event-save-result', { detail: { ok: true, requestId } }));
-                adminSwitch('events');
+                const created = detail.eventId == null;
+                let eventId = detail.eventId;
+                if (created) {
+                    const saved = await r.json().catch(() => ({}));
+                    eventId = saved.event && saved.event.id;
+                }
+                adminMsg((created ? 'Created' : 'Updated') + ' "' + body.name + '"', true);
+                window.dispatchEvent(new CustomEvent('gvdg:admin-event-save-result', { detail: { ok: true, requestId, eventId: eventId } }));
+                if (created && eventId != null) adminSwitch('registration', { eventId: eventId });
+                else adminSwitch('events');
                 adminLoadEvents();
             } else {
                 const message = (detail.eventId != null ? 'Update' : 'Create') + ' failed (' + r.status + ')';
@@ -756,6 +764,15 @@ export function startAdminController() {
         }
         function setAdminProductsListState(state) {
             window.dispatchEvent(new CustomEvent('gvdg:admin-products-list', { detail: state }));
+        }
+        async function adminLoadShelf() {
+            let products = [];
+            try {
+                const r = await adminApi('/admin/shop/products?status=active');
+                if (r.ok) products = (await r.json()).products || [];
+            } catch (e) {}
+            const low = products.filter((product) => Number(product.stock_qty) <= 2);
+            window.dispatchEvent(new CustomEvent('gvdg:admin-shelf', { detail: { count: low.length, name: low[0] && low[0].name || '' } }));
         }
         async function adminCreateProductFromReact(detail) {
             const body = detail.body || {};

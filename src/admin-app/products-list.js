@@ -26,7 +26,9 @@ function normalizeProduct(product) {
     source,
     active: Number(source.active) === 1 || source.active === true,
     brand: normalizeText(source.brand),
+    category: normalizeText(source.category, "disc") || "disc",
     color: normalizeText(source.color),
+    description: normalizeText(source.description),
     id: source.id == null ? "" : String(source.id),
     imageUrl: normalizeText(source.image_url),
     name,
@@ -98,6 +100,34 @@ function ProductRow({ product }) {
     setActive(product.active);
   }, [product.id, product.priceCents, product.stockQty, product.active]);
 
+  function requestAnother() {
+    dispatchRequest("gvdg:admin-product-repeat", {
+      product: {
+        brand: product.brand,
+        category: product.category,
+        color: product.color,
+        description: product.description,
+        imageUrl: product.imageUrl,
+        name: product.name,
+        price: priceInputValue(product.priceCents),
+        productType: product.productType,
+        weight: product.weightG != null ? String(product.weightG) : "",
+      },
+    });
+  }
+
+  function sellOne() {
+    const current = Number(stockValue);
+    if (!Number.isFinite(current) || current < 1) return;
+    const next = current - 1;
+    setStockValue(String(next));
+    dispatchRequest("gvdg:admin-product-save-request", {
+      active: product.active,
+      priceValue: priceInputValue(product.priceCents),
+      product: product.source,
+      stockValue: String(next),
+    });
+  }
   function requestSave() {
     dispatchRequest("gvdg:admin-product-save-request", {
       active,
@@ -152,6 +182,8 @@ function ProductRow({ product }) {
         }),
         active ? " active" : " archived",
       ]),
+      h("button", { className: "admin-btn", disabled: Number(stockValue) < 1, key: "sold", onClick: sellOne, type: "button" }, Number(stockValue) < 1 ? "Sold out" : "Sold"),
+      h("button", { className: "admin-btn secondary", key: "another", onClick: requestAnother, type: "button" }, "Add another"),
       h("button", { className: "admin-btn secondary", key: "save", onClick: requestSave, type: "button" }, "Save"),
       h("button", { className: "admin-btn danger", key: "delete", onClick: requestDelete, type: "button" }, "Delete"),
     ]),

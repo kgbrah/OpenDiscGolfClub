@@ -77,6 +77,7 @@ function EventCard({ event, featured }) {
 export function AdminTodayDashboard() {
   const [state, setState] = React.useState(EMPTY_STATE);
   const [orders, setOrders] = React.useState(() => currentAdminOrdersBadgeCount());
+  const [shelf, setShelf] = React.useState(null);
 
   React.useEffect(() => {
     function updateEvents(event) {
@@ -89,11 +90,20 @@ export function AdminTodayDashboard() {
     function updateOrders(event) {
       setOrders(Number(event.detail?.count) || currentAdminOrdersBadgeCount());
     }
+    function updateShelf(event) {
+      const count = Number(event.detail && event.detail.count);
+      setShelf({
+        count: Number.isFinite(count) ? count : 0,
+        name: event.detail && event.detail.name ? String(event.detail.name) : "",
+      });
+    }
     window.addEventListener("gvdg:admin-events-list", updateEvents);
     window.addEventListener("gvdg:admin-orders-badge", updateOrders);
+    window.addEventListener("gvdg:admin-shelf", updateShelf);
     return () => {
       window.removeEventListener("gvdg:admin-events-list", updateEvents);
       window.removeEventListener("gvdg:admin-orders-badge", updateOrders);
+      window.removeEventListener("gvdg:admin-shelf", updateShelf);
     };
   }, []);
 
@@ -129,7 +139,13 @@ export function AdminTodayDashboard() {
         key: "orders",
         onClick: () => requestTab("orders"),
         type: "button",
-      }, [h("strong", { key: "v" }, orders ? `${orders} new` : "None"), h("span", { key: "k" }, "Shop orders")]),
+      }, [h("strong", { key: "v" }, orders ? `${orders} to hand off` : "None waiting"), h("span", { key: "k" }, "Shop orders")]),
+      h("button", {
+        className: "admin-today-tile",
+        key: "shelf",
+        onClick: () => requestTab("shop"),
+        type: "button",
+      }, [h("strong", { key: "v" }, shelf == null ? "…" : shelf.count ? `${shelf.count} low` : "Stocked"), h("span", { key: "k" }, shelf && shelf.count === 1 && shelf.name ? shelf.name : "Shelf")]),
     ]),
     rest.length ? h("h3", { className: "admin-pane-kicker", key: "week-title" }, "Up next") : null,
     ...rest.map((event) => h(EventCard, { event, featured: false, key: event.id })),

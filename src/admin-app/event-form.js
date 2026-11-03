@@ -1,7 +1,15 @@
 import React from "react";
 
-import { clubWallClockToIso, isoToClubWallClock } from "../shared/events-model.js";
+import { clubToday, clubWallClockToIso, isoToClubWallClock } from "../shared/events-model.js";
 import { applyEventVoice, VoiceFill } from "./voice-fill.js";
+import {
+  calendarDaysBetween,
+  minusWallMinutes,
+  nextWeeklyDate,
+  pickRepeatEvent,
+  repeatLabel,
+  shiftWallByDays,
+} from "./repeat-draft.js";
 
 const h = React.createElement;
 
@@ -211,6 +219,16 @@ function eventPayload(form, courseRows, quickLayout) {
   return { body, labelText: body.name, valid: true };
 }
 
+function wallClockLabel(value) {
+  const match = String(value || "").match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+  if (!match) return "";
+  const hour = Number(match[2]);
+  const shown = hour % 12 || 12;
+  const suffix = hour < 12 ? "AM" : "PM";
+  const day = new Date(`${match[1]}T12:00:00Z`).toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${day}, ${shown}:${match[3]} ${suffix}`;
+}
+
 function formField({ children, id, label }) {
   return h("div", { key: id }, [
     h("label", { htmlFor: id, key: "label" }, label),
@@ -236,6 +254,8 @@ export function AdminEventForm() {
   const [layoutChoice, setLayoutChoice] = React.useState("");
   const [quickLayout, setQuickLayout] = React.useState({ defaultPar: "3", holeCount: "18", name: "" });
   const [busy, setBusy] = React.useState(false);
+  const [savedEvents, setSavedEvents] = React.useState([]);
+  const [timesOpen, setTimesOpen] = React.useState(false);
   const currentRequest = React.useRef("");
   const requestCounter = React.useRef(0);
   const rowCounter = React.useRef(0);
@@ -247,6 +267,7 @@ export function AdminEventForm() {
     setCourseRows(blankCourseRows());
     setLayoutChoice("");
     setQuickLayout({ defaultPar: "3", holeCount: "18", name: "" });
+    setTimesOpen(false);
     setBusy(false);
   }
 
@@ -272,13 +293,19 @@ export function AdminEventForm() {
       if (!state.courseId) return;
       setLayoutsByCourse((current) => ({ ...current, [state.courseId]: state }));
     }
+    function updateEvents(event) {
+      const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
+      setSavedEvents(Array.isArray(detail.events) ? detail.events : []);
+    }
     window.addEventListener("gvdg:admin-courses-list", updateCourses);
     window.addEventListener("gvdg:admin-leagues-list", updateLeagues);
     window.addEventListener("gvdg:admin-event-form-layouts", updateLayouts);
+    window.addEventListener("gvdg:admin-events-list", updateEvents);
     return () => {
       window.removeEventListener("gvdg:admin-courses-list", updateCourses);
       window.removeEventListener("gvdg:admin-leagues-list", updateLeagues);
       window.removeEventListener("gvdg:admin-event-form-layouts", updateLayouts);
+      window.removeEventListener("gvdg:admin-events-list", updateEvents);
     };
   }, []);
 
@@ -296,10 +323,12 @@ export function AdminEventForm() {
       const source = event.detail && event.detail.event;
       if (!source) return;
       const rows = courseRowsFromEvent(source);
+      const filled = formFromEvent(source);
       setEditingEvent(source);
-      setForm(formFromEvent(source));
+      setForm(filled);
       setCourseRows(rows);
       setLayoutChoice(rows[0]?.layoutId ?? "");
+      setTimesOpen(Boolean(filled.registrationDeadline || filled.checkinDeadline));
       rows.forEach((row) => {
         if (row.courseId) loadLayouts(row.courseId, row.layoutId);
       });
@@ -360,10 +389,43 @@ export function AdminEventForm() {
     setCourseRows((current) => current.filter((row) => row.key === PRIMARY_COURSE_ROW_KEY || row.key !== key));
   }
 
+  function applyRepeat(source) {
+    const today = clubToday(new Date());
+    const base = formFromEvent(source);
+    const anchor = base.date || String(base.startsAt || "").slice(0, 10);
+    const nextDate = nextWeeklyDate(anchor, today) || anchor;
+    const days = calendarDaysBetween(anchor, nextDate);
+    const rows = courseRowsFromEvent(source);
+    setEditingEvent(null);
+    setForm({
+      ...base,
+      checkinDeadline: shiftWallByDays(base.checkinDeadline, days),
+      date: nextDate,
+      registrationDeadline: shiftWallByDays(base.registrationDeadline, days),
+      startsAt: shiftWallByDays(base.startsAt, days),
+      status: "scheduled",
+    });
+    setCourseRows(rows);
+    setLayoutChoice(rows[0]?.layoutId ?? "");
+    setTimesOpen(false);
+    rows.forEach((row) => {
+      if (row.courseId) loadLayouts(row.courseId, row.layoutId);
+    });
+  }
+
+  function formForSave() {
+    if (timesOpen || form.registrationDeadline || form.checkinDeadline || !form.startsAt) return form;
+    return {
+      ...form,
+      checkinDeadline: minusWallMinutes(form.startsAt, 15),
+      registrationDeadline: form.startsAt,
+    };
+  }
+
   function submit(event) {
     event.preventDefault();
     const requestId = `event-save-${requestCounter.current += 1}`;
-    const payload = eventPayload(form, courseRows, quickLayout);
+    const payload = eventPayload(formForSave(), courseRows, quickLayout);
     currentRequest.current = requestId;
     setBusy(payload.valid);
     dispatchRequest("gvdg:admin-event-save-request", { ...payload, eventId: editingEvent?.id ?? null, requestId });
@@ -415,10 +477,23 @@ export function AdminEventForm() {
     ]);
   }
 
+  const repeatSource = editingEvent ? null : pickRepeatEvent(savedEvents, clubToday(new Date()));
+  const repeatWhen = repeatSource ? nextWeeklyDate(repeatSource.date, clubToday(new Date())) : "";
   const note = editingEvent ? `Editing "${editingEvent.name || "event"}" from the Events menu.` : "Create a scheduled event, fundraiser, meeting, or league round.";
+  const registrationText = wallClockLabel(form.registrationDeadline || form.startsAt);
+  const checkinText = wallClockLabel(form.checkinDeadline || (form.startsAt ? minusWallMinutes(form.startsAt, 15) : ""));
+  const timeNote = form.startsAt
+    ? `Registration closes ${registrationText || "at the start"}. Check-in closes ${checkinText || "15 minutes before"}.`
+    : "Add a start time. Registration closes then, and check-in closes 15 minutes before.";
 
   return h("div", { "data-react-admin-event-form": editingEvent ? "edit" : "create" }, [
     h("p", { className: "admin-form-note", id: "aeModeNote", key: "note" }, note),
+    repeatSource ? h("button", {
+      className: "admin-btn secondary",
+      key: "repeat",
+      onClick: () => applyRepeat(repeatSource),
+      type: "button",
+    }, repeatLabel(repeatSource, repeatWhen)) : null,
     h(VoiceFill, {
       form: "event",
       key: "voice",
@@ -429,8 +504,17 @@ export function AdminEventForm() {
       formField({ id: "aeName", label: "Name", children: h("input", { id: "aeName", key: "input", maxLength: 200, onChange: (event) => updateField("name", event.target.value), ref: nameInput, required: true, value: form.name }) }),
       formField({ id: "aeDate", label: "Date", children: h("input", { id: "aeDate", key: "input", onChange: (event) => updateField("date", event.target.value), type: "date", value: form.date }) }),
       formField({ id: "aeStartsAt", label: "Start time (ET)", children: h("input", { id: "aeStartsAt", key: "input", onChange: (event) => updateField("startsAt", event.target.value), type: "datetime-local", value: form.startsAt }) }),
-      formField({ id: "aeRegistrationDeadline", label: "Registration deadline (ET)", children: h("input", { id: "aeRegistrationDeadline", key: "input", onChange: (event) => updateField("registrationDeadline", event.target.value), type: "datetime-local", value: form.registrationDeadline }) }),
-      formField({ id: "aeCheckinDeadline", label: "Check-in deadline (ET)", children: h("input", { id: "aeCheckinDeadline", key: "input", onChange: (event) => updateField("checkinDeadline", event.target.value), type: "datetime-local", value: form.checkinDeadline }) }),
+      h("div", { key: "times" }, [
+        h("p", { className: "admin-form-note", key: "summary" }, timeNote),
+        h("button", {
+          className: "admin-btn secondary",
+          key: "toggle",
+          onClick: () => setTimesOpen((open) => !open),
+          type: "button",
+        }, timesOpen ? "Hide times" : "Change times"),
+        timesOpen ? formField({ id: "aeRegistrationDeadline", label: "Registration deadline (ET)", children: h("input", { id: "aeRegistrationDeadline", key: "input", onChange: (event) => updateField("registrationDeadline", event.target.value), type: "datetime-local", value: form.registrationDeadline }) }) : null,
+        timesOpen ? formField({ id: "aeCheckinDeadline", label: "Check-in deadline (ET)", children: h("input", { id: "aeCheckinDeadline", key: "input", onChange: (event) => updateField("checkinDeadline", event.target.value), type: "datetime-local", value: form.checkinDeadline }) }) : null,
+      ]),
       formField({ id: "aeStatus", label: "Status", children: h("select", { id: "aeStatus", key: "input", onChange: (event) => updateField("status", event.target.value), value: form.status }, [
         form.status === "live" ? h("option", { key: "live", value: "live", disabled: true, hidden: true }, "Live (from scoring)") : null,
         option("scheduled", "Scheduled"),
