@@ -629,7 +629,9 @@
         .throw-film-timer { margin: 0; font-weight: 800; color: var(--over); }
         .throw-film-error { margin: 0; color: var(--over); font-weight: 700; }
         .throw-film-star { display: flex; align-items: center; gap: 0.45rem; font-weight: 700; }
-        .throw-film-actions { display: flex; gap: 0.45rem; }
+        .throw-film-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+        .throw-film-light { min-width: 48px; }
+        .throw-film-light.on { background: var(--primary); color: var(--light); border-color: var(--primary); }
         .throw-film-note { margin: 0; font-size: 0.78rem; }
         .score-glove-tools .scorecard-owner {
             margin-left: auto; padding: 0; margin-bottom: 0; border: 0; gap: 0;
@@ -1126,6 +1128,6 @@
     <div id="scoreReactLeaderboardSheetApp"></div>
     <div id="scoreReactManagePlayersSheetApp"></div>
     <div id="scoreReactDialogsApp"></div>
-    <script type="module" src="score-app/score-app.js?v=204"></script>
+    <script type="module" src="score-app/score-app.js?v=208"></script>
 </body>
 </html>

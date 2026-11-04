@@ -273,6 +273,39 @@ async function useSaveableCameraMode(stream, landscape) {
   return track;
 }
 
+export function trackSupportsTorch(track) {
+  if (!track) return false;
+  if (typeof track.getCapabilities !== "function") return true;
+  const caps = track.getCapabilities() || {};
+  if (caps.torch === false) return false;
+  if (caps.torch === true) return true;
+  const facing = typeof track.getSettings === "function" ? String(track.getSettings().facingMode || "") : "";
+  return facing !== "user";
+}
+
+export function torchConstraints(track, on) {
+  const current = track && typeof track.getConstraints === "function" ? track.getConstraints() : {};
+  const base = current && typeof current === "object" ? { ...current } : {};
+  const advanced = Array.isArray(base.advanced) ? base.advanced.map((item) => ({ ...item })) : [];
+  if (!advanced.length) advanced.push({});
+  advanced[0] = { ...advanced[0], torch: Boolean(on) };
+  return { ...base, advanced };
+}
+
+export async function setTrackTorch(track, on) {
+  if (!track || typeof track.applyConstraints !== "function") return false;
+  const shapes = [torchConstraints(track, on), { advanced: [{ torch: Boolean(on) }] }];
+  for (const constraints of shapes) {
+    try {
+      await track.applyConstraints(constraints);
+      return true;
+    } catch {
+      /* some phones only accept the torch by itself */
+    }
+  }
+  return false;
+}
+
 function recorderMime() {
   if (typeof MediaRecorder === "undefined") return "";
   // mp4 plays on iPhone and Android. webm does not play on iPhone.
@@ -382,7 +415,10 @@ function ThrowFilmSheet(props) {
   const streamRef = React.useRef(null);
   const recorderRef = React.useRef(null);
   const chunksRef = React.useRef([]);
-  const timerRef = React.useRef(0);
+  const [torchOn, setTorchOn] = React.useState(false);
+  const [lightReady, setLightReady] = React.useState(true);
+  const torchOnRef = React.useRef(false);
+  const openingRef = React.useRef(null);
 
   React.useEffect(() => {
     setHighlight(Boolean(suggestedMoment(player.currentScore, props.par)));
@@ -397,8 +433,75 @@ function ThrowFilmSheet(props) {
   const dropRef = React.useRef(false);
 
   function stopStream() {
-    if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
+    const stream = streamRef.current;
     streamRef.current = null;
+    torchOnRef.current = false;
+    setTorchOn(false);
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    const turnOff = track ? setTrackTorch(track, false) : Promise.resolve(false);
+    void turnOff.finally(() => stream.getTracks().forEach((item) => item.stop()));
+  }
+
+  async function attachPreview(stream) {
+    streamRef.current = stream;
+    const landscapeNow = phoneIsLandscape();
+    const track = await useSaveableCameraMode(stream, landscapeNow);
+    const settings = track && typeof track.getSettings === "function" ? track.getSettings() : {};
+    setLightReady(trackSupportsTorch(track));
+    if (liveRef.current) {
+      liveRef.current.srcObject = stream;
+      const orientation = frameOrientation(settings.width, settings.height);
+      liveRef.current.dataset.orientation = orientation;
+      if (settings.width && settings.height) liveRef.current.style.aspectRatio = settings.width + " / " + settings.height;
+      liveRef.current.play().catch(() => {});
+    }
+    if (torchOnRef.current && track) {
+      const lit = await setTrackTorch(track, true);
+      torchOnRef.current = lit;
+      setTorchOn(lit);
+      if (!lit) setError("This phone won't turn the light on from the browser.");
+    }
+    return { settings, track };
+  }
+
+  async function ensurePreview() {
+    if (streamRef.current) return streamRef.current;
+    if (openingRef.current) return openingRef.current;
+    openingRef.current = (async () => {
+      try {
+        const stream = await openCamera(phoneIsLandscape());
+        await attachPreview(stream);
+        setPhase((current) => current === "idle" ? "preview" : current);
+        return stream;
+      } finally {
+        openingRef.current = null;
+      }
+    })();
+    return openingRef.current;
+  }
+
+  async function toggleLight() {
+    const want = !torchOnRef.current;
+    torchOnRef.current = want;
+    setTorchOn(want);
+    setError("");
+    try {
+      const stream = await ensurePreview();
+      const track = stream.getVideoTracks()[0];
+      const lit = await setTrackTorch(track, want);
+      if (want && !lit) {
+        torchOnRef.current = false;
+        setTorchOn(false);
+        setLightReady(trackSupportsTorch(track));
+        setError("This phone won't turn the light on from the browser.");
+      }
+    } catch (error) {
+      torchOnRef.current = false;
+      setTorchOn(false);
+      const denied = error && (error.name === "NotAllowedError" || error.name === "PermissionDeniedError");
+      setError(denied ? "Camera permission is needed to use the light." : "The camera didn't open. Try again.");
+    }
   }
 
   async function start() {
@@ -408,19 +511,10 @@ function ThrowFilmSheet(props) {
       setError("This phone can't record video in the browser.");
       return;
     }
-    const landscapeNow = phoneIsLandscape();
     try {
-      const stream = await openCamera(landscapeNow);
-      streamRef.current = stream;
-      const track = await useSaveableCameraMode(stream, landscapeNow);
+      const stream = await ensurePreview();
+      const track = stream.getVideoTracks()[0];
       const settings = track && typeof track.getSettings === "function" ? track.getSettings() : {};
-      if (liveRef.current) {
-        liveRef.current.srcObject = stream;
-        const orientation = frameOrientation(settings.width, settings.height);
-        liveRef.current.dataset.orientation = orientation;
-        if (settings.width && settings.height) liveRef.current.style.aspectRatio = settings.width + " / " + settings.height;
-        liveRef.current.play().catch(() => {});
-      }
       chunksRef.current = [];
       const recorder = makeRecorder(stream, mime, throwVideoBitrate(settings.width, settings.height));
       recorder.ondataavailable = (event) => {
@@ -585,6 +679,15 @@ function ThrowFilmSheet(props) {
       "Round highlight",
     ]),
     h("div", { className: "throw-film-actions", key: "actions" }, [
+      phase !== "review" && phase !== "saving" && (phase === "idle" || lightReady || torchOn)
+        ? h("button", {
+          "aria-pressed": torchOn ? "true" : "false",
+          className: "btn secondary throw-film-light" + (torchOn ? " on" : ""),
+          key: "light",
+          onClick: () => { void toggleLight(); },
+          type: "button",
+        }, torchOn ? "Light on" : "Light")
+        : null,
       phase === "recording"
         ? h("button", { className: "btn primary", key: "stop", onClick: stop, type: "button" }, "Stop")
         : phase === "review" || phase === "saving"
