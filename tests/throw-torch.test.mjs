@@ -3,22 +3,16 @@ import test from "node:test";
 
 import { setTrackTorch, torchConstraints, trackSupportsTorch } from "../src/score-app/throw-film.js";
 
-test("the rear camera can take a torch constraint without dropping the picture size", () => {
+test("the light is switched without restarting the picture size", async () => {
+  let applied = null;
   const track = {
-    constraints: { width: { ideal: 1920 }, height: { ideal: 1080 } },
-    getConstraints() { return this.constraints; },
-    async applyConstraints(next) {
-      this.constraints = next;
-    },
+    readyState: "live",
+    async applyConstraints(next) { applied = next; },
   };
-  const next = torchConstraints(track, true);
-  assert.equal(next.advanced[0].torch, true);
-  assert.equal(next.width.ideal, 1920);
-  return setTrackTorch(track, true).then((ok) => {
-    assert.equal(ok, true);
-    assert.equal(track.constraints.advanced[0].torch, true);
-    assert.equal(track.constraints.width.ideal, 1920);
-  });
+  assert.deepEqual(torchConstraints(true), { advanced: [{ torch: true }] });
+  assert.equal(await setTrackTorch(track, true), true);
+  assert.deepEqual(applied, { advanced: [{ torch: true }] });
+  assert.equal(applied.width, undefined);
 });
 
 test("the front camera is not offered a light", () => {

@@ -283,27 +283,19 @@ export function trackSupportsTorch(track) {
   return facing !== "user";
 }
 
-export function torchConstraints(track, on) {
-  const current = track && typeof track.getConstraints === "function" ? track.getConstraints() : {};
-  const base = current && typeof current === "object" ? { ...current } : {};
-  const advanced = Array.isArray(base.advanced) ? base.advanced.map((item) => ({ ...item })) : [];
-  if (!advanced.length) advanced.push({});
-  advanced[0] = { ...advanced[0], torch: Boolean(on) };
-  return { ...base, advanced };
+export function torchConstraints(on) {
+  // Send the light by itself. Resending picture size restarts the camera and drops the recording.
+  return { advanced: [{ torch: Boolean(on) }] };
 }
 
 export async function setTrackTorch(track, on) {
-  if (!track || typeof track.applyConstraints !== "function") return false;
-  const shapes = [torchConstraints(track, on), { advanced: [{ torch: Boolean(on) }] }];
-  for (const constraints of shapes) {
-    try {
-      await track.applyConstraints(constraints);
-      return true;
-    } catch {
-      /* some phones only accept the torch by itself */
-    }
+  if (!track || track.readyState === "ended" || typeof track.applyConstraints !== "function") return false;
+  try {
+    await track.applyConstraints(torchConstraints(on));
+    return track.readyState !== "ended";
+  } catch {
+    return false;
   }
-  return false;
 }
 
 function recorderMime() {
@@ -415,6 +407,7 @@ function ThrowFilmSheet(props) {
   const streamRef = React.useRef(null);
   const recorderRef = React.useRef(null);
   const chunksRef = React.useRef([]);
+  const timerRef = React.useRef(0);
   const [torchOn, setTorchOn] = React.useState(false);
   const [lightReady, setLightReady] = React.useState(true);
   const torchOnRef = React.useRef(false);
@@ -438,9 +431,7 @@ function ThrowFilmSheet(props) {
     torchOnRef.current = false;
     setTorchOn(false);
     if (!stream) return;
-    const track = stream.getVideoTracks()[0];
-    const turnOff = track ? setTrackTorch(track, false) : Promise.resolve(false);
-    void turnOff.finally(() => stream.getTracks().forEach((item) => item.stop()));
+    stream.getTracks().forEach((item) => item.stop());
   }
 
   async function attachPreview(stream) {
@@ -455,12 +446,6 @@ function ThrowFilmSheet(props) {
       liveRef.current.dataset.orientation = orientation;
       if (settings.width && settings.height) liveRef.current.style.aspectRatio = settings.width + " / " + settings.height;
       liveRef.current.play().catch(() => {});
-    }
-    if (torchOnRef.current && track) {
-      const lit = await setTrackTorch(track, true);
-      torchOnRef.current = lit;
-      setTorchOn(lit);
-      if (!lit) setError("This phone won't turn the light on from the browser.");
     }
     return { settings, track };
   }
@@ -514,7 +499,13 @@ function ThrowFilmSheet(props) {
     try {
       const stream = await ensurePreview();
       const track = stream.getVideoTracks()[0];
-      const settings = track && typeof track.getSettings === "function" ? track.getSettings() : {};
+      if (!track || track.readyState === "ended") {
+        stopStream();
+        setPhase("idle");
+        setError("The light reset the camera. Tap Record again.");
+        return;
+      }
+      const settings = track.getSettings ? track.getSettings() : {};
       chunksRef.current = [];
       const recorder = makeRecorder(stream, mime, throwVideoBitrate(settings.width, settings.height));
       recorder.ondataavailable = (event) => {
@@ -540,7 +531,11 @@ function ThrowFilmSheet(props) {
         setPhase("review");
       };
       recorderRef.current = recorder;
-      try { recorder.start(1000); } catch { recorder.start(); }
+      try {
+        recorder.start(1000);
+      } catch {
+        recorder.start();
+      }
       setSeconds(0);
       setPhase("recording");
       const started = Date.now();
