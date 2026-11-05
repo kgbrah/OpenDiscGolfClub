@@ -135,7 +135,13 @@ export function EventRegistrationCard({ event, registration, token, paymentsConf
     ]),
     eventMeta(event) ? h("div", { className: "register-fee", key: "meta" }, eventMeta(event)) : null,
     h(EventScheduleFacts, { event, key: "schedule" }),
-    h(AddToCalendarButton, { item: calendarEventFromClub(event), key: "cal" }),
+    event.status === "final"
+      ? h("a", {
+        className: "passkey-btn",
+        href: `events.html#event/${encodeURIComponent(event.id)}`,
+        key: "results",
+      }, "View results")
+      : h(AddToCalendarButton, { item: calendarEventFromClub(event), key: "cal" }),
     !event._synth ? h(EventFieldRoster, { compact: true, key: "field", players: event.field }) : null,
     !event._synth ? h("div", { className: "register-fee", key: "fee" }, `${event.entry_fee_cents ? `${dollars(event.entry_fee_cents)} entry` : "Free entry"}${event.play_format ? ` - ${formatLabel(event.play_format)}` : ""}`) : null,
     registration && event.status === "cancelled"

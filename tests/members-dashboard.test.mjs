@@ -280,6 +280,8 @@ test('member dashboard can post a casual round and jump to a live scorecard', ()
   assert.match(casual, /function CasualRoundForm/);
   assert.match(casual, /request\("\/casual-rounds", \{/);
   assert.match(events, /score\.html\?event=/); // live registered events link to their scorecard
+  assert.match(events, /View results/);
+  assert.match(events, /events\.html#event\//);
 });
 
 test('member dashboard registration cards post pair label only for doubles events', () => {
