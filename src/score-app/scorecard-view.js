@@ -10,6 +10,7 @@ import { PotsStrip } from "./pots-strip.js";
 import { WeatherStrip } from "./weather-strip.js";
 import { nextHoleScore, relClass, relText, strokeLabel } from "./score-view-model.js";
 import { RoundHighlights, ThrowFilm } from "./throw-film.js";
+import { RoundTalk } from "./round-talk.js";
 
 const h = React.createElement;
 
@@ -1207,6 +1208,13 @@ export function ScorecardView(props) {
           measureLabel,
           measuring,
           onMeasure,
+        }),
+        h(RoundTalk, {
+          key: "talk",
+          live: true,
+          players: (Array.isArray(props.rows) ? props.rows : []).map((row) => row && row.label).filter(Boolean),
+          viewer: "card",
+          viewerName: ((Array.isArray(props.rows) ? props.rows : []).find((row) => row && row.isMe) || {}).label || "",
         }),
         h(RoundHighlights, { canStar: true, key: "clips" }),
         h(HoleGrid, { holes: props.holeGrid, onJump: props.onJumpHole }),

@@ -19,6 +19,7 @@ import { weatherLocationForCourse } from "./weather.js";
 import { buildCasualArchiveSnapshot, shouldUseCasualArchive } from "./casual-archive.js";
 import { liveHolesWithPins, overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
 import { cardFromMine, handleThrowClips } from "./throw-clip-routes.js";
+import { handleRoundMessages } from "./round-message-routes.js";
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // unambiguous (no 0/O/1/I/L)
 function genCode(): string {
@@ -134,6 +135,25 @@ export async function handleCasualRounds(
     return handleThrowClips({
       request, env, origin, method, scope: "round", scopeKey: code, tail: seg.slice(4),
       authMember: null, card: null,
+    });
+  }
+
+  if (sub === "live" && seg[3] === "messages") {
+    const snapRes = await stub.fetch("https://do/snapshot");
+    const snap = await snapRes.json().catch(() => ({})) as { status?: string };
+    const live = snap?.status === "live";
+    let onCard = false;
+    let serverName = "";
+    if (method === "POST") {
+      const actor = await requireRoundActor(request, env);
+      if (actor) {
+        serverName = actor.name;
+        const mineRes = await stub.fetch("https://do/mine", { headers: { "X-Auth-Member": actor.sub } });
+        onCard = mineRes.status === 200;
+      }
+    }
+    return handleRoundMessages({
+      request, env, origin, method, scope: "round", scopeKey: code, live, onCard, serverName,
     });
   }
 

@@ -14,6 +14,7 @@ import { weatherLocationForCourse } from "./weather.js";
 import { playersMatch } from "./player-identity.js";
 import { liveHolesWithPins, overlayLiveSnapshot, submitLiveMapMark } from "./course-map-marks-routes.js";
 import { cardFromMine, handleThrowClips } from "./throw-clip-routes.js";
+import { handleRoundMessages } from "./round-message-routes.js";
 
 type RosterPlayer = { memberId: string | null; name: string; division: string | null; startingHole: number | null; team: string | null };
 
@@ -286,6 +287,27 @@ export async function handleClubLive(
       headers: { "X-Auth-Member": id.authMember },
     });
     return json(await r.json().catch(() => ({})), r.status, origin);
+  }
+
+  if (sub === "messages") {
+    const event = (await db.getEvent(env.DB, eid)) as { status?: string } | null;
+    const live = event?.status === "live";
+    let onCard = false;
+    let serverName = "";
+    if (method === "POST") {
+      const id = await scoreIdentity(request, env, null);
+      if (id.authMember) {
+        const mineRes = await stub.fetch("https://do/mine", { headers: { "X-Auth-Member": id.authMember } });
+        onCard = mineRes.status === 200;
+        if (!id.authMember.startsWith("g_")) {
+          const member = await getMember(env.ROSTER, id.authMember);
+          serverName = member?.name || "";
+        }
+      }
+    }
+    return handleRoundMessages({
+      request, env, origin, method, scope: "event", scopeKey: String(eid), live, onCard, serverName,
+    });
   }
 
   if (sub === "clips") {

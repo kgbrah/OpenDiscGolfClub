@@ -25,6 +25,7 @@ import {
   scoreMixRows,
 } from "./score-view-model.js";
 import { RoundHighlights } from "./throw-film.js";
+import { RoundTalk } from "./round-talk.js";
 
 const h = React.createElement;
 
@@ -386,6 +387,12 @@ export function WatchView(props) {
       ? h("p", { className: "muted watch-meta", key: "meta" }, [props.courseName, props.layoutName].filter(Boolean).join(" · "))
       : null,
     h(RoundHighlights, { key: "highlights", live: props.status !== "final" }),
+    h(RoundTalk, {
+      key: "talk",
+      live: props.status !== "final",
+      players: standings.map((standing) => standing && (standing.name || standing.label)).filter(Boolean),
+      viewer: "watch",
+    }),
     h(WatchHoles, {
       activeHoleIndex: props.activeHoleIndex,
       focus,
