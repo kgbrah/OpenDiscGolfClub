@@ -119,11 +119,15 @@
     updateBanner = root;
   }
 
+  var publishedCommit = '';
+  var versionChecked = false;
+
   function refreshNow(registration) {
     if (refreshing) return;
     refreshing = true;
     try {
-      localStorage.removeItem(SNOOZE_KEY);
+      if (publishedCommit) localStorage.setItem(BUILD_KEY, publishedCommit);
+      localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
     } catch (err) {}
     if (registration && registration.waiting) {
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -136,6 +140,12 @@
   function watchRegistration(registration) {
     if (!registration) return;
     function prompt() {
+      if (!versionChecked || !publishedCommit || snoozed()) return;
+      var seen = '';
+      try {
+        seen = localStorage.getItem(BUILD_KEY) || '';
+      } catch (err) {}
+      if (!seen || seen === publishedCommit) return;
       showBanner(function () { refreshNow(registration); });
     }
     if (registration.waiting && navigator.serviceWorker.controller) prompt();
@@ -152,16 +162,15 @@
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
       return res.ok ? res.json() : null;
     }).then(function (data) {
+      versionChecked = true;
       if (!data || !data.commit) return;
+      publishedCommit = data.commit;
       var seen = '';
       try {
         seen = localStorage.getItem(BUILD_KEY) || '';
       } catch (err) {}
       if (seen && seen !== data.commit) {
         showBanner(function () {
-          try {
-            localStorage.setItem(BUILD_KEY, data.commit);
-          } catch (err) {}
           refreshNow();
         });
         return;
@@ -171,7 +180,9 @@
           localStorage.setItem(BUILD_KEY, data.commit);
         } catch (err) {}
       }
-    }).catch(function () {});
+    }).catch(function () {
+      versionChecked = true;
+    });
   }
 
   checkPublishedBuild();
