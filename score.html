@@ -632,10 +632,16 @@
         .throw-film-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
         .throw-film-light { min-width: 48px; }
         .throw-film-light.on { background: var(--primary); color: var(--light); border-color: var(--primary); }
-        .round-talk { margin: 0.35rem 0 0.7rem; }
-        .round-talk-toggle { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; width: 100%; min-height: 48px; padding: 0.65rem 0.85rem; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-secondary); color: inherit; font: inherit; font-weight: 800; text-align: left; }
-        .round-talk-badge { min-width: 1.4rem; padding: 0.1rem 0.4rem; border-radius: 999px; background: var(--primary); color: var(--light); font-size: 0.75rem; text-align: center; }
-        .round-talk-panel { display: grid; gap: 0.45rem; margin-top: 0.4rem; }
+        .round-talk { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; margin: 0.15rem 0.2rem 0.35rem; }
+        .round-talk-bubble { position: relative; width: 48px; height: 48px; min-width: 48px; min-height: 48px; padding: 0; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-secondary); color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; }
+        .round-talk-bubble.has-new { border-color: var(--primary); color: var(--primary); }
+        .round-talk-badge { position: absolute; top: -0.2rem; right: -0.2rem; min-width: 1.15rem; height: 1.15rem; padding: 0 0.25rem; border-radius: 999px; background: var(--primary); color: var(--light); font-size: 0.68rem; font-weight: 800; line-height: 1.15rem; text-align: center; }
+        .round-talk-toast { display: grid; gap: 0.1rem; max-width: min(18rem, 78vw); padding: 0.55rem 0.7rem; border: 0; border-radius: 14px; background: var(--bg-secondary); color: inherit; text-align: left; box-shadow: 0 8px 24px var(--card-shadow); }
+        .round-talk-toast strong { font-size: 0.78rem; }
+        .round-talk-toast span { font-size: 0.88rem; color: var(--text-secondary); }
+        .round-talk.open { align-items: stretch; }
+        .round-talk.open .round-talk-bubble { align-self: flex-end; }
+        .round-talk-panel { display: grid; gap: 0.45rem; }
         .round-talk-list { display: grid; gap: 0.35rem; max-height: 220px; overflow-y: auto; }
         .round-talk-row { padding: 0.5rem 0.65rem; border-radius: 12px; background: var(--bg-tertiary); }
         .round-talk-row.card { background: var(--bg-secondary); border: 1px solid var(--border-color); }
@@ -1140,6 +1146,6 @@
     <div id="scoreReactLeaderboardSheetApp"></div>
     <div id="scoreReactManagePlayersSheetApp"></div>
     <div id="scoreReactDialogsApp"></div>
-    <script type="module" src="score-app/score-app.js?v=210"></script>
+    <script type="module" src="score-app/score-app.js?v=211"></script>
 </body>
 </html>

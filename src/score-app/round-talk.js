@@ -1,4 +1,5 @@
 import React from "react";
+import { MessageCircle } from "lucide-react";
 
 import { resolveApiBase } from "../shared/api-base.js";
 import { liveRoundCodeFromSearch } from "../shared/live-watch.js";
@@ -72,8 +73,10 @@ export function RoundTalk({ live, players, viewer, viewerName }) {
   const [busy, setBusy] = React.useState(false);
   const [note, setNote] = React.useState("");
   const [seen, setSeen] = React.useState(0);
+  const [toast, setToast] = React.useState(null);
   const listRef = React.useRef(null);
   const seeded = React.useRef(false);
+  const seenRef = React.useRef(0);
   const names = [...new Set((Array.isArray(players) ? players : []).map((player) => String(player || "").trim()).filter(Boolean))];
 
   React.useEffect(() => {
@@ -111,15 +114,28 @@ export function RoundTalk({ live, players, viewer, viewerName }) {
   React.useEffect(() => {
     if (open || seeded.current || !messages.length) return;
     seeded.current = true;
-    setSeen(Number(messages[messages.length - 1].id) || messages.length);
+    seenRef.current = Number(messages[messages.length - 1].id) || messages.length;
+    setSeen(seenRef.current);
   }, [messages, open]);
 
   React.useEffect(() => {
     if (!open || !listRef.current) return;
     listRef.current.scrollTop = listRef.current.scrollHeight;
     const last = messages.length ? Number(messages[messages.length - 1].id) || messages.length : 0;
+    seenRef.current = last;
     setSeen(last);
+    setToast(null);
   }, [open, messages]);
+
+  React.useEffect(() => {
+    if (open || !seeded.current || !messages.length) return undefined;
+    const latest = messages[messages.length - 1];
+    const id = Number(latest.id) || messages.length;
+    if (id <= seenRef.current) return undefined;
+    setToast(latest);
+    const timer = window.setTimeout(() => setToast(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [messages, open]);
 
   if (!path || !live) return null;
   const last = messages.length ? Number(messages[messages.length - 1].id) || messages.length : 0;
@@ -156,16 +172,26 @@ export function RoundTalk({ live, players, viewer, viewerName }) {
     }
   }
 
-  return h("section", { className: "round-talk", "data-react-round-talk": open ? "open" : "closed" }, [
+  return h("section", { className: "round-talk" + (open ? " open" : ""), "data-react-round-talk": open ? "open" : "closed" }, [
+    toast && !open ? h("button", {
+      className: "round-talk-toast",
+      key: "toast",
+      onClick: () => setOpen(true),
+      type: "button",
+    }, [
+      h("strong", { key: "who" }, toast.authorName),
+      h("span", { key: "body" }, toast.body),
+    ]) : null,
     h("button", {
       "aria-expanded": open ? "true" : "false",
-      className: "round-talk-toggle",
+      "aria-label": unread ? `Messages, ${unread} new` : "Messages",
+      className: "round-talk-bubble" + (unread ? " has-new" : ""),
       key: "toggle",
       onClick: () => setOpen((current) => !current),
       type: "button",
     }, [
-      h("span", { key: "label" }, viewer === "card" ? "Messages from the gallery" : "Message the card"),
-      unread ? h("span", { className: "round-talk-badge", key: "badge" }, String(unread)) : null,
+      h(MessageCircle, { "aria-hidden": "true", focusable: "false", key: "icon", size: 22, strokeWidth: 2.4 }),
+      unread ? h("span", { className: "round-talk-badge", key: "badge" }, unread > 9 ? "9+" : String(unread)) : null,
     ]),
     open ? h("div", { className: "round-talk-panel", key: "panel" }, [
       h("div", { className: "round-talk-list", key: "list", ref: listRef }, messages.length
