@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { MessageCircle } from "lucide-react";
 
 import { resolveApiBase } from "../shared/api-base.js";
@@ -47,6 +48,31 @@ function sendError(status) {
   if (status === 413) return "Keep it under 280 characters.";
   if (status === 400) return "Need a name and a message.";
   return "Couldn't send that.";
+}
+
+function useAboveDock(active) {
+  const [bottom, setBottom] = React.useState("0.75rem");
+  React.useEffect(() => {
+    if (!active || typeof document === "undefined") return undefined;
+    const dock = document.querySelector(".score-glove-dock");
+    function place() {
+      if (!dock) {
+        setBottom("0.75rem");
+        return;
+      }
+      const gap = window.innerHeight - dock.getBoundingClientRect().top + 8;
+      setBottom(Math.max(8, Math.round(gap)) + "px");
+    }
+    place();
+    window.addEventListener("resize", place);
+    const observer = dock && typeof ResizeObserver === "function" ? new ResizeObserver(place) : null;
+    if (observer) observer.observe(dock);
+    return () => {
+      window.removeEventListener("resize", place);
+      if (observer) observer.disconnect();
+    };
+  }, [active]);
+  return bottom;
 }
 
 function TalkRow({ message }) {
@@ -137,6 +163,9 @@ export function RoundTalk({ inline, live, players, viewer, viewerName }) {
     return () => window.clearTimeout(timer);
   }, [messages, open]);
 
+  const lift = Boolean(inline && (open || toast));
+  const aboveDock = useAboveDock(lift);
+
   if (!path || !live) return null;
   const last = messages.length ? Number(messages[messages.length - 1].id) || messages.length : 0;
   const unread = !open && last > seen ? last - seen || messages.length : 0;
@@ -172,16 +201,58 @@ export function RoundTalk({ inline, live, players, viewer, viewerName }) {
     }
   }
 
+  const sheetStyle = inline ? { bottom: aboveDock } : undefined;
+  const toastNode = toast && !open ? h("button", {
+    className: "round-talk-toast" + (inline ? " round-talk-sheet" : ""),
+    key: "toast",
+    onClick: () => setOpen(true),
+    style: sheetStyle,
+    type: "button",
+  }, [
+    h("strong", { key: "who" }, toast.authorName),
+    h("span", { key: "body" }, toast.body),
+  ]) : null;
+  const panelNode = open ? h("div", {
+    className: "round-talk-panel" + (inline ? " round-talk-sheet" : ""),
+    key: "panel",
+    style: sheetStyle,
+  }, [
+    h("div", { className: "round-talk-list", key: "list", ref: listRef }, messages.length
+      ? messages.map((message) => h(TalkRow, { key: message.id || message.body, message }))
+      : h("p", { className: "muted", key: "empty" }, chatOpen ? "No messages yet." : "Messages open while the round is live.")),
+    h("form", { className: "round-talk-form", key: "form", onSubmit: (event) => { void send(event); } }, [
+      viewer === "watch" && names.length ? h("select", {
+        "aria-label": "Who is this for",
+        key: "to",
+        onChange: (event) => setToName(event.target.value),
+        value: toName,
+      }, [
+        h("option", { key: "card", value: "" }, "The card"),
+        ...names.map((player) => h("option", { key: player, value: player }, player)),
+      ]) : null,
+      showName ? h("input", {
+        "aria-label": "Your name",
+        key: "name",
+        maxLength: 32,
+        onChange: (event) => setName(event.target.value),
+        placeholder: "Your name",
+        value: name,
+      }) : null,
+      h("input", {
+        "aria-label": "Message",
+        key: "draft",
+        maxLength: ROUND_MESSAGE_MAX,
+        onChange: (event) => setDraft(event.target.value),
+        placeholder: viewer === "card" ? "Reply" : "Say something",
+        value: draft,
+      }),
+      h("button", { className: "btn primary", disabled: busy, key: "send", type: "submit" }, busy ? "Sending" : "Send"),
+    ]),
+    note ? h("p", { className: "round-talk-note", key: "note", role: "alert" }, note) : null,
+  ]) : null;
+
   return h("section", { className: "round-talk" + (open ? " open" : "") + (inline ? " is-inline" : ""), "data-react-round-talk": open ? "open" : "closed" }, [
-    toast && !open ? h("button", {
-      className: "round-talk-toast",
-      key: "toast",
-      onClick: () => setOpen(true),
-      type: "button",
-    }, [
-      h("strong", { key: "who" }, toast.authorName),
-      h("span", { key: "body" }, toast.body),
-    ]) : null,
+    inline ? null : toastNode,
     h("button", {
       "aria-expanded": open ? "true" : "false",
       "aria-label": unread ? `Messages, ${unread} new` : "Messages",
@@ -193,39 +264,7 @@ export function RoundTalk({ inline, live, players, viewer, viewerName }) {
       h(MessageCircle, { "aria-hidden": "true", focusable: "false", key: "icon", size: 22, strokeWidth: 2.4 }),
       unread ? h("span", { className: "round-talk-badge", key: "badge" }, unread > 9 ? "9+" : String(unread)) : null,
     ]),
-    open ? h("div", { className: "round-talk-panel", key: "panel" }, [
-      h("div", { className: "round-talk-list", key: "list", ref: listRef }, messages.length
-        ? messages.map((message) => h(TalkRow, { key: message.id || message.body, message }))
-        : h("p", { className: "muted", key: "empty" }, chatOpen ? "No messages yet." : "Messages open while the round is live.")),
-      h("form", { className: "round-talk-form", key: "form", onSubmit: (event) => { void send(event); } }, [
-        viewer === "watch" && names.length ? h("select", {
-          "aria-label": "Who is this for",
-          key: "to",
-          onChange: (event) => setToName(event.target.value),
-          value: toName,
-        }, [
-          h("option", { key: "card", value: "" }, "The card"),
-          ...names.map((player) => h("option", { key: player, value: player }, player)),
-        ]) : null,
-        showName ? h("input", {
-          "aria-label": "Your name",
-          key: "name",
-          maxLength: 32,
-          onChange: (event) => setName(event.target.value),
-          placeholder: "Your name",
-          value: name,
-        }) : null,
-        h("input", {
-          "aria-label": "Message",
-          key: "draft",
-          maxLength: ROUND_MESSAGE_MAX,
-          onChange: (event) => setDraft(event.target.value),
-          placeholder: viewer === "card" ? "Reply" : "Say something",
-          value: draft,
-        }),
-        h("button", { className: "btn primary", disabled: busy, key: "send", type: "submit" }, busy ? "Sending" : "Send"),
-      ]),
-      note ? h("p", { className: "round-talk-note", key: "note", role: "alert" }, note) : null,
-    ]) : null,
+    inline ? null : panelNode,
+    inline && typeof document !== "undefined" ? createPortal(h(React.Fragment, { key: "sheet" }, [toastNode, panelNode]), document.body) : null,
   ]);
 }

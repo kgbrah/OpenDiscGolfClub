@@ -642,13 +642,16 @@
         .round-talk-panel { display: grid; gap: 0.45rem; }
         .score-glove-tools .round-talk { position: static; display: block; margin: 0; flex: 0 0 auto; }
         .score-glove-tools .round-talk-bubble { width: 36px; height: 36px; min-width: 36px; min-height: 36px; border-radius: 10px; }
-        .score-glove-tools .round-talk-panel,
-        .score-glove-tools .round-talk-toast {
-            position: absolute; z-index: 8; top: calc(100% + 0.28rem); left: 0; right: 0;
-            background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 12px;
+        .round-talk-sheet {
+            position: fixed; left: 0.55rem; right: 0.55rem; z-index: 45;
+            max-height: min(46dvh, 20rem); overflow: auto;
+            box-shadow: 0 -8px 28px var(--card-shadow);
         }
-        .score-glove-tools .round-talk-toast { left: auto; right: 0; width: min(18rem, 78vw); }
-        .score-glove-tools .round-talk-panel { padding: 0.5rem; }
+        .round-talk-panel.round-talk-sheet {
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 16px; padding: 0.55rem;
+        }
+        .round-talk-toast.round-talk-sheet { left: auto; width: min(18rem, 78vw); max-height: none; overflow: visible; }
         .round-talk-list { display: grid; gap: 0.35rem; max-height: 220px; overflow-y: auto; }
         .round-talk-row { padding: 0.5rem 0.65rem; border-radius: 12px; background: var(--bg-tertiary); }
         .round-talk-row.card { background: var(--bg-secondary); border: 1px solid var(--border-color); }
@@ -1153,6 +1156,6 @@
     <div id="scoreReactLeaderboardSheetApp"></div>
     <div id="scoreReactManagePlayersSheetApp"></div>
     <div id="scoreReactDialogsApp"></div>
-    <script type="module" src="score-app/score-app.js?v=212"></script>
+    <script type="module" src="score-app/score-app.js?v=213"></script>
 </body>
 </html>
