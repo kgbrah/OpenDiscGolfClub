@@ -305,6 +305,14 @@ function RoundTools(props) {
       [icon(Ruler), h("span", { key: "label" }, props.measureLabel || "Measure")],
     ),
     h(ThrowFilm, { hole: props.hole, key: "film", rows: props.rows }),
+    h(RoundTalk, {
+      inline: true,
+      key: "talk",
+      live: true,
+      players: (Array.isArray(props.rows) ? props.rows : []).map((row) => row && row.label).filter(Boolean),
+      viewer: "card",
+      viewerName: ((Array.isArray(props.rows) ? props.rows : []).find((row) => row && row.isMe) || {}).label || "",
+    }),
     showManage
       ? h("button", { className: "score-glove-tool", key: "manage", type: "button", onClick: props.onManagePlayers }, [
         icon(Settings2),
@@ -1208,13 +1216,6 @@ export function ScorecardView(props) {
           measureLabel,
           measuring,
           onMeasure,
-        }),
-        h(RoundTalk, {
-          key: "talk",
-          live: true,
-          players: (Array.isArray(props.rows) ? props.rows : []).map((row) => row && row.label).filter(Boolean),
-          viewer: "card",
-          viewerName: ((Array.isArray(props.rows) ? props.rows : []).find((row) => row && row.isMe) || {}).label || "",
         }),
         h(RoundHighlights, { canStar: true, key: "clips" }),
         h(HoleGrid, { holes: props.holeGrid, onJump: props.onJumpHole }),

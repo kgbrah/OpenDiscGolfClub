@@ -61,7 +61,7 @@ function TalkRow({ message }) {
   ]);
 }
 
-export function RoundTalk({ live, players, viewer, viewerName }) {
+export function RoundTalk({ inline, live, players, viewer, viewerName }) {
   const path = React.useMemo(() => messagePathFromLocation(window.location), []);
   const api = React.useMemo(() => resolveApiBase({ datasetKeys: ["apiBase"] }), []);
   const [open, setOpen] = React.useState(false);
@@ -172,7 +172,7 @@ export function RoundTalk({ live, players, viewer, viewerName }) {
     }
   }
 
-  return h("section", { className: "round-talk" + (open ? " open" : ""), "data-react-round-talk": open ? "open" : "closed" }, [
+  return h("section", { className: "round-talk" + (open ? " open" : "") + (inline ? " is-inline" : ""), "data-react-round-talk": open ? "open" : "closed" }, [
     toast && !open ? h("button", {
       className: "round-talk-toast",
       key: "toast",
@@ -185,7 +185,7 @@ export function RoundTalk({ live, players, viewer, viewerName }) {
     h("button", {
       "aria-expanded": open ? "true" : "false",
       "aria-label": unread ? `Messages, ${unread} new` : "Messages",
-      className: "round-talk-bubble" + (unread ? " has-new" : ""),
+      className: (inline ? "score-glove-tool " : "") + "round-talk-bubble" + (unread ? " has-new" : ""),
       key: "toggle",
       onClick: () => setOpen((current) => !current),
       type: "button",
